@@ -292,6 +292,7 @@
     font-family: 'Cormorant Garamond', 'Georgia', serif;
     font-size: 38px;
     white-space: nowrap;
+    transition: opacity 0.5s ease-in-out;
     font-weight: 300;
     color: rgba(255, 255, 255, 0.85);
     letter-spacing: 5px;
@@ -309,6 +310,7 @@
     left: 50%;
     transform: translateX(-50%);
     z-index: 10;
+    transition: opacity 0.5s ease-in-out;
     width: 42px;
     height: 42px;
     border-radius: 50%;
@@ -635,6 +637,153 @@
     transition: opacity 0.4s ease-in-out;
   }
 
+  /* ============ PROGRESS BAR ============ */
+
+  .progress-area {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.5s ease-in-out;
+    width: 400px;
+  }
+
+  #frame.active .progress-area {
+    opacity: 1;
+  }
+
+  .progress-bar-track {
+    width: 100%;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 2px;
+    background: linear-gradient(90deg, rgba(140, 180, 255, 0.6), rgba(200, 220, 255, 1), rgba(140, 180, 255, 0.6));
+    box-shadow: 0 0 12px rgba(150, 190, 255, 0.6), 0 0 25px rgba(130, 170, 255, 0.3);
+    transition: width 0.1s linear;
+  }
+
+  .progress-info {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    align-items: center;
+  }
+
+  .progress-text {
+    font-family: 'Avenir Next Cyr', 'Inter', sans-serif;
+    font-size: 18px;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.6);
+    letter-spacing: 1px;
+  }
+
+  .progress-percent {
+    font-family: 'Avenir Next Cyr', 'Inter', sans-serif;
+    font-size: 22px;
+    font-weight: 500;
+    color: rgba(200, 220, 255, 0.9);
+    letter-spacing: 1px;
+    text-shadow: 0 0 10px rgba(150, 180, 255, 0.4);
+  }
+
+  /* ============ DISCOUNT REWARD ============ */
+
+  .discount-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 15;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 30px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.6s ease-in-out;
+  }
+
+  .discount-overlay.visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .discount-title {
+    font-family: 'Didot', 'Georgia', serif;
+    font-size: 80px;
+    font-weight: 700;
+    color: #fff;
+    text-align: center;
+    letter-spacing: 3px;
+  }
+
+  .discount-value {
+    font-family: 'Didot', 'Georgia', serif;
+    font-size: 140px;
+    font-weight: 700;
+    color: rgba(200, 220, 255, 1);
+    text-shadow: 0 0 30px rgba(150, 180, 255, 0.5), 0 0 60px rgba(130, 160, 255, 0.3);
+    letter-spacing: 5px;
+  }
+
+  .discount-subtitle {
+    font-family: 'Avenir Next Cyr', 'Inter', sans-serif;
+    font-size: 28px;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.7);
+    text-align: center;
+    letter-spacing: 2px;
+    max-width: 700px;
+    line-height: 1.5;
+  }
+
+  .discount-qr {
+    width: 250px;
+    height: 250px;
+    border-radius: 12px;
+    margin-top: 10px;
+  }
+
+  .discount-scan {
+    font-family: 'Avenir Next Cyr', 'Inter', sans-serif;
+    font-size: 22px;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.5);
+    letter-spacing: 4px;
+    text-transform: uppercase;
+  }
+
+  .discount-close-hint {
+    font-family: 'Avenir Next Cyr', 'Inter', sans-serif;
+    font-size: 16px;
+    color: rgba(255, 255, 255, 0.3);
+    margin-top: 20px;
+  }
+
+  /* Hide touch text and lang button when active */
+  #frame.active .touch-text,
+  #frame.active .lang-btn {
+    opacity: 0;
+    pointer-events: none;
+  }
+
   /* ============ PARTICLES ============ */
 
   #particle-canvas {
@@ -651,7 +800,7 @@
     position: absolute;
     top: 0; left: 0;
     width: 1080px; height: 1920px;
-    z-index: 5;
+    z-index: 2;
     pointer-events: none;
   }
 </style>
@@ -699,6 +848,17 @@
     </button>
   </div>
 
+  <!-- Progress bar -->
+  <div class="progress-area" id="progressArea">
+    <div class="progress-bar-track">
+      <div class="progress-bar-fill" id="progressFill"></div>
+    </div>
+    <div class="progress-info">
+      <span class="progress-text" id="progressText">Keep holding for a special offer</span>
+      <span class="progress-percent" id="progressPercent">0%</span>
+    </div>
+  </div>
+
   <!-- Touch text + language (independent from circle) -->
   <span class="touch-text" id="touchText">Touch to Create</span>
   <button class="lang-btn" id="langBtn">LV</button>
@@ -711,6 +871,16 @@
       <span class="qr-label" id="ticketsLabel">Tickets</span>
       <img class="qr-code" src="assets/qr-code.png" alt="QR">
     </div>
+  </div>
+
+  <!-- Discount reward overlay -->
+  <div class="discount-overlay" id="discountOverlay">
+    <div class="discount-title" id="discountTitle">Congratulations!</div>
+    <div class="discount-value">-20%</div>
+    <div class="discount-subtitle" id="discountSubtitle">You've unlocked a special discount on your ticket</div>
+    <img class="discount-qr" src="assets/qr-code.png" alt="QR">
+    <div class="discount-scan" id="discountScan">Scan to buy</div>
+    <div class="discount-close-hint" id="discountHint">Tap anywhere to close</div>
   </div>
 
   <!-- Info button -->
@@ -924,6 +1094,21 @@
   const fxMain = new TextScramble(titleMain);
   const fxSub = new TextScramble(titleSub);
 
+  // --- Flash overlay ---
+  const flashOverlay = document.createElement('div');
+  flashOverlay.style.cssText = 'position:absolute;inset:0;background:#fff;opacity:0;z-index:6;pointer-events:none;transition:opacity 0.08s;';
+  frame.appendChild(flashOverlay);
+
+  function triggerFlashes() {
+    const delays = [50, 200, 400, 1400, 1550, 1750];
+    delays.forEach(d => {
+      setTimeout(() => {
+        flashOverlay.style.opacity = '0.7';
+        setTimeout(() => { flashOverlay.style.opacity = '0'; }, 50);
+      }, d);
+    });
+  }
+
   function activate() {
     wasActive = true;
     btn.classList.add('active');
@@ -934,6 +1119,7 @@
     titleSub.classList.add('scrambling');
     fxMain.setText(lang === 'lv' ? 'IESPAIDĪGA' : 'IMMERSIVE').then(() => titleMain.classList.remove('scrambling'));
     fxSub.setText(lang === 'lv' ? 'IZSTĀDE' : 'EXHIBITION').then(() => titleSub.classList.remove('scrambling'));
+    triggerFlashes();
   }
 
   let wasActive = false;
@@ -951,10 +1137,85 @@
     fxSub.setText('— El tocco dell\'Eterno').then(() => titleSub.classList.remove('scrambling'));
   }
 
-  btn.addEventListener('mousedown', activate);
-  window.addEventListener('mouseup', deactivate);
-  btn.addEventListener('touchstart', (e) => { e.preventDefault(); activate(); });
-  window.addEventListener('touchend', deactivate);
+  // --- Progress bar ---
+  const progressFill = document.getElementById('progressFill');
+  const progressPercent = document.getElementById('progressPercent');
+  const progressText = document.getElementById('progressText');
+  const PROGRESS_DURATION = 10000; // 10 seconds
+  let progressStart = 0;
+  let progressRAF = null;
+  let progressComplete = false;
+
+  const progressTexts = {
+    en: 'Keep holding for a special offer',
+    lv: 'Turiet, lai saņemtu īpašo piedāvājumu'
+  };
+
+  function updateProgress() {
+    if (!isActive || progressComplete) return;
+    const elapsed = Date.now() - progressStart;
+    const pct = Math.min(elapsed / PROGRESS_DURATION * 100, 100);
+    progressFill.style.width = pct + '%';
+    progressPercent.textContent = Math.floor(pct) + '%';
+
+    if (pct >= 100) {
+      progressComplete = true;
+      progressPercent.textContent = '100%';
+      showDiscount();
+      return;
+    }
+    progressRAF = requestAnimationFrame(updateProgress);
+  }
+
+  function startProgress() {
+    progressStart = Date.now();
+    progressComplete = false;
+    progressText.textContent = progressTexts[lang];
+    progressFill.style.width = '0%';
+    progressPercent.textContent = '0%';
+    updateProgress();
+  }
+
+  // --- Discount overlay ---
+  const discountOverlay = document.getElementById('discountOverlay');
+  const discountTitle = document.getElementById('discountTitle');
+  const discountSubtitle = document.getElementById('discountSubtitle');
+  const discountScan = document.getElementById('discountScan');
+  const discountHint = document.getElementById('discountHint');
+
+  const discountTexts = {
+    en: { title: 'Congratulations!', subtitle: "You've unlocked a special discount on your ticket", scan: 'Scan to buy', hint: 'Tap anywhere to close' },
+    lv: { title: 'Apsveicam!', subtitle: 'Jūs esat atbloķējis īpašu atlaidi biļetei', scan: 'Skenējiet, lai iegādātos', hint: 'Pieskarieties, lai aizvērtu' }
+  };
+
+  function showDiscount() {
+    const t = discountTexts[lang];
+    discountTitle.textContent = t.title;
+    discountSubtitle.textContent = t.subtitle;
+    discountScan.textContent = t.scan;
+    discountHint.textContent = t.hint;
+    discountOverlay.classList.add('visible');
+  }
+
+  function hideDiscount() {
+    discountOverlay.classList.remove('visible');
+    deactivate();
+    resetProgress();
+  }
+
+  discountOverlay.addEventListener('click', hideDiscount);
+
+  function resetProgress() {
+    cancelAnimationFrame(progressRAF);
+    progressFill.style.width = '0%';
+    progressPercent.textContent = '0%';
+    progressComplete = false;
+  }
+
+  btn.addEventListener('mousedown', () => { activate(); startProgress(); });
+  window.addEventListener('mouseup', () => { deactivate(); resetProgress(); });
+  btn.addEventListener('touchstart', (e) => { e.preventDefault(); activate(); startProgress(); });
+  window.addEventListener('touchend', () => { deactivate(); resetProgress(); });
 
   // --- Particles ---
   const particleCanvas = document.getElementById('particle-canvas');
@@ -1002,35 +1263,26 @@
 
   const centerX = 540;
   const centerY = 806;
-  const TENDRIL_COUNT = 12;
-  const TENDRIL_LENGTH = 120;
 
-  const tendrils = [];
-  for (let i = 0; i < TENDRIL_COUNT; i++) {
-    tendrils.push({
-      angle: (i / TENDRIL_COUNT) * Math.PI * 2,
-      phase: Math.random() * Math.PI * 2,
-      speed: 3 + Math.random() * 5,
-      length: TENDRIL_LENGTH + Math.random() * 60,
-      width: 1 + Math.random() * 2,
-      opacity: 0.15 + Math.random() * 0.25,
-      wobble: 15 + Math.random() * 25,
-      segments: 12 + Math.floor(Math.random() * 8),
-    });
-  }
+  // Expanding energy rings
+  const rings = [];
+  const MAX_RINGS = 5;
 
-  const sparkParticles = [];
-  for (let i = 0; i < 25; i++) {
-    sparkParticles.push({
+  // Orbiting energy sparks
+  const orbitSparks = [];
+  for (let i = 0; i < 30; i++) {
+    orbitSparks.push({
       angle: Math.random() * Math.PI * 2,
-      dist: Math.random(),
-      speed: 0.008 + Math.random() * 0.02,
-      size: 1 + Math.random() * 2.5,
+      radius: 20 + Math.random() * 100,
+      speed: (1 + Math.random() * 3) * (Math.random() > 0.5 ? 1 : -1),
+      size: 1 + Math.random() * 3,
       opacity: 0.3 + Math.random() * 0.5,
       phase: Math.random() * Math.PI * 2,
-      maxDist: 80 + Math.random() * 80,
+      pulseSpeed: 2 + Math.random() * 3,
     });
   }
+
+  let lastRingTime = 0;
 
   function drawPlasma() {
     requestAnimationFrame(drawPlasma);
@@ -1046,64 +1298,68 @@
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
 
-    // === RADIAL TENDRILS ===
-    for (const t of tendrils) {
-      const angleWobble = Math.sin(time * t.speed * 0.5 + t.phase) * 0.3;
-      const currentAngle = t.angle + angleWobble;
+    // === EXPANDING RINGS (spawn periodically) ===
+    if (isActive && time - lastRingTime > 0.4) {
+      lastRingTime = time;
+      rings.push({ radius: 5, opacity: 0.7, width: 2.5 });
+      if (rings.length > MAX_RINGS) rings.shift();
+    }
 
+    for (let i = rings.length - 1; i >= 0; i--) {
+      const ring = rings[i];
+      ring.radius += 2.5;
+      ring.opacity *= 0.97;
+      ring.width *= 0.98;
+
+      if (ring.opacity < 0.01) { rings.splice(i, 1); continue; }
+
+      const r = ring.radius * beamProgress;
       ctx.beginPath();
-      ctx.moveTo(centerX, centerY);
-
-      for (let s = 1; s <= t.segments; s++) {
-        const frac = s / t.segments;
-        const dist = t.length * frac * beamProgress;
-        const perpWobble = Math.sin(time * t.speed + frac * 6 + t.phase) * t.wobble * frac * (1 - frac * 0.5);
-
-        const dx = Math.cos(currentAngle) * dist - Math.sin(currentAngle) * perpWobble * beamProgress;
-        const dy = Math.sin(currentAngle) * dist + Math.cos(currentAngle) * perpWobble * beamProgress;
-
-        ctx.lineTo(centerX + dx, centerY + dy);
-      }
-
-      const r = Math.round(130 + Math.sin(time + t.phase) * 30);
-      const g = Math.round(160 + Math.sin(time * 0.7 + t.phase) * 40);
-      const b = Math.round(240 + Math.sin(time * 1.3 + t.phase) * 15);
-      ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${t.opacity * beamProgress})`;
-      ctx.lineWidth = t.width * beamProgress;
-      ctx.shadowColor = `rgba(${r}, ${g}, 255, 0.5)`;
-      ctx.shadowBlur = 10 * beamProgress;
+      ctx.arc(centerX, centerY, r, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(160, 200, 255, ${ring.opacity * beamProgress})`;
+      ctx.lineWidth = ring.width * beamProgress;
+      ctx.shadowColor = 'rgba(140, 180, 255, 0.4)';
+      ctx.shadowBlur = 15 * beamProgress;
       ctx.stroke();
     }
     ctx.shadowBlur = 0;
 
-    // === SPARK PARTICLES ===
-    for (const sp of sparkParticles) {
-      sp.dist += sp.speed;
-      if (sp.dist > 1) {
-        sp.dist = 0;
-        sp.angle = Math.random() * Math.PI * 2;
-      }
+    // === ORBITING SPARKS ===
+    for (const sp of orbitSparks) {
+      sp.angle += sp.speed * 0.02;
+      const pulse = 0.7 + Math.sin(time * sp.pulseSpeed + sp.phase) * 0.3;
+      const r = sp.radius * beamProgress * pulse;
 
-      const d = sp.dist * sp.maxDist * beamProgress;
-      const wobbleAngle = sp.angle + Math.sin(time * 2 + sp.phase) * 0.3;
-      const px = centerX + Math.cos(wobbleAngle) * d;
-      const py = centerY + Math.sin(wobbleAngle) * d;
-      const pSize = sp.size * beamProgress * (1 - sp.dist * 0.5);
+      const px = centerX + Math.cos(sp.angle) * r;
+      const py = centerY + Math.sin(sp.angle) * r;
+      const pSize = sp.size * beamProgress;
 
-      const pGrad = ctx.createRadialGradient(px, py, 0, px, py, pSize * 3);
-      pGrad.addColorStop(0, `rgba(200, 220, 255, ${sp.opacity * beamProgress * (1 - sp.dist)})`);
-      pGrad.addColorStop(1, 'rgba(150, 170, 255, 0)');
-      ctx.fillStyle = pGrad;
+      const grad = ctx.createRadialGradient(px, py, 0, px, py, pSize * 3);
+      grad.addColorStop(0, `rgba(200, 220, 255, ${sp.opacity * beamProgress})`);
+      grad.addColorStop(0.5, `rgba(150, 180, 255, ${sp.opacity * 0.3 * beamProgress})`);
+      grad.addColorStop(1, 'rgba(130, 160, 255, 0)');
+      ctx.fillStyle = grad;
       ctx.fillRect(px - pSize * 3, py - pSize * 3, pSize * 6, pSize * 6);
     }
 
-    // === CENTER GLOW ===
-    const glow = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 70 * beamProgress);
-    glow.addColorStop(0, `rgba(200, 220, 255, ${0.7 * beamProgress})`);
-    glow.addColorStop(0.3, `rgba(150, 170, 255, ${0.25 * beamProgress})`);
-    glow.addColorStop(1, 'rgba(120, 140, 255, 0)');
+    // === CENTER GLOW (pulsing) ===
+    const glowPulse = 0.8 + Math.sin(time * 3) * 0.2;
+    const glowSize = 80 * beamProgress * glowPulse;
+    const glow = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, glowSize);
+    glow.addColorStop(0, `rgba(220, 235, 255, ${0.8 * beamProgress})`);
+    glow.addColorStop(0.2, `rgba(170, 200, 255, ${0.4 * beamProgress})`);
+    glow.addColorStop(0.5, `rgba(140, 170, 255, ${0.15 * beamProgress})`);
+    glow.addColorStop(1, 'rgba(120, 150, 255, 0)');
     ctx.fillStyle = glow;
-    ctx.fillRect(centerX - 80, centerY - 80, 160, 160);
+    ctx.fillRect(centerX - glowSize, centerY - glowSize, glowSize * 2, glowSize * 2);
+
+    // === STATIC ENERGY RING (subtle, always visible when active) ===
+    const staticR = 55 + Math.sin(time * 2) * 5;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, staticR * beamProgress, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(180, 210, 255, ${0.15 * beamProgress})`;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
 
     ctx.restore();
   }
