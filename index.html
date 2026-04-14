@@ -671,70 +671,6 @@
     transition: opacity 0.4s ease-in-out;
   }
 
-  /* ============ PROGRESS BAR ============ */
-
-  .progress-area {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 10;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 15px;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.5s ease-in-out;
-    width: 400px;
-  }
-
-  #frame.active .progress-area {
-    opacity: 1;
-  }
-
-  .progress-bar-track {
-    width: 100%;
-    height: 4px;
-    background: rgba(255, 255, 255, 0.15);
-    border-radius: 2px;
-    overflow: hidden;
-    position: relative;
-  }
-
-  .progress-bar-fill {
-    height: 100%;
-    width: 0%;
-    border-radius: 2px;
-    background: linear-gradient(90deg, rgba(140, 180, 255, 0.6), rgba(200, 220, 255, 1), rgba(140, 180, 255, 0.6));
-    box-shadow: 0 0 12px rgba(150, 190, 255, 0.6), 0 0 25px rgba(130, 170, 255, 0.3);
-    transition: width 0.1s linear;
-  }
-
-  .progress-info {
-    display: flex;
-    justify-content: space-between;
-    width: 100%;
-    align-items: center;
-  }
-
-  .progress-text {
-    font-family: 'Avenir Next Cyr', 'Inter', sans-serif;
-    font-size: 18px;
-    font-weight: 400;
-    color: rgba(255, 255, 255, 0.6);
-    letter-spacing: 1px;
-  }
-
-  .progress-percent {
-    font-family: 'Avenir Next Cyr', 'Inter', sans-serif;
-    font-size: 22px;
-    font-weight: 500;
-    color: rgba(200, 220, 255, 0.9);
-    letter-spacing: 1px;
-    text-shadow: 0 0 10px rgba(150, 180, 255, 0.4);
-  }
-
   /* ============ DISCOUNT REWARD ============ */
 
   .discount-overlay {
@@ -847,7 +783,7 @@
 
   <!-- Logo and address next to circle (appear on active) -->
   <div class="circle-logo"><img src="assets/logo.png" alt="Digital Art House"></div>
-  <div class="circle-address">Riga, Skolas iela 2</div>
+  <div class="circle-address">Rīga, Skolas iela 2</div>
 
   <!-- Sky -->
   <div class="sky-gradient"></div>
@@ -891,17 +827,7 @@
   </div>
 
   <!-- Progress bar -->
-  <div class="progress-area" id="progressArea">
-    <div class="progress-bar-track">
-      <div class="progress-bar-fill" id="progressFill"></div>
-    </div>
-    <div class="progress-info">
-      <span class="progress-text" id="progressText">Keep holding for a special offer</span>
-      <span class="progress-percent" id="progressPercent">0%</span>
-    </div>
-  </div>
-
-  <!-- Touch text + language (independent from circle) -->
+<!-- Touch text + language (independent from circle) -->
   <span class="touch-text" id="touchText">Touch to Create</span>
   <button class="lang-btn" id="langBtn">LV</button>
 
@@ -1194,85 +1120,10 @@
     fxSub.setText('— El tocco dell\'Eterno').then(() => titleSub.classList.remove('scrambling'));
   }
 
-  // --- Progress bar ---
-  const progressFill = document.getElementById('progressFill');
-  const progressPercent = document.getElementById('progressPercent');
-  const progressText = document.getElementById('progressText');
-  const PROGRESS_DURATION = 10000; // 10 seconds
-  let progressStart = 0;
-  let progressRAF = null;
-  let progressComplete = false;
-
-  const progressTexts = {
-    en: 'Keep holding for a special offer',
-    lv: 'Turiet, lai saņemtu īpašo piedāvājumu'
-  };
-
-  function updateProgress() {
-    if (!isActive || progressComplete) return;
-    const elapsed = Date.now() - progressStart;
-    const pct = Math.min(elapsed / PROGRESS_DURATION * 100, 100);
-    progressFill.style.width = pct + '%';
-    progressPercent.textContent = Math.floor(pct) + '%';
-
-    if (pct >= 100) {
-      progressComplete = true;
-      progressPercent.textContent = '100%';
-      showDiscount();
-      return;
-    }
-    progressRAF = requestAnimationFrame(updateProgress);
-  }
-
-  function startProgress() {
-    progressStart = Date.now();
-    progressComplete = false;
-    progressText.textContent = progressTexts[lang];
-    progressFill.style.width = '0%';
-    progressPercent.textContent = '0%';
-    updateProgress();
-  }
-
-  // --- Discount overlay ---
-  const discountOverlay = document.getElementById('discountOverlay');
-  const discountTitle = document.getElementById('discountTitle');
-  const discountSubtitle = document.getElementById('discountSubtitle');
-  const discountScan = document.getElementById('discountScan');
-  const discountHint = document.getElementById('discountHint');
-
-  const discountTexts = {
-    en: { title: 'Congratulations!', subtitle: "You've unlocked a special discount on your ticket", scan: 'Scan to buy', hint: 'Tap anywhere to close' },
-    lv: { title: 'Apsveicam!', subtitle: 'Jūs esat atbloķējis īpašu atlaidi biļetei', scan: 'Skenējiet, lai iegādātos', hint: 'Pieskarieties, lai aizvērtu' }
-  };
-
-  function showDiscount() {
-    const t = discountTexts[lang];
-    discountTitle.textContent = t.title;
-    discountSubtitle.textContent = t.subtitle;
-    discountScan.textContent = t.scan;
-    discountHint.textContent = t.hint;
-    discountOverlay.classList.add('visible');
-  }
-
-  function hideDiscount() {
-    discountOverlay.classList.remove('visible');
-    deactivate();
-    resetProgress();
-  }
-
-  discountOverlay.addEventListener('click', hideDiscount);
-
-  function resetProgress() {
-    cancelAnimationFrame(progressRAF);
-    progressFill.style.width = '0%';
-    progressPercent.textContent = '0%';
-    progressComplete = false;
-  }
-
-  btn.addEventListener('mousedown', () => { activate(); startProgress(); });
-  window.addEventListener('mouseup', () => { deactivate(); resetProgress(); });
-  btn.addEventListener('touchstart', (e) => { e.preventDefault(); activate(); startProgress(); });
-  window.addEventListener('touchend', () => { deactivate(); resetProgress(); });
+  btn.addEventListener('mousedown', activate);
+  window.addEventListener('mouseup', deactivate);
+  btn.addEventListener('touchstart', (e) => { e.preventDefault(); activate(); });
+  window.addEventListener('touchend', deactivate);
 
   // --- Particles ---
   const particleCanvas = document.getElementById('particle-canvas');
