@@ -21,6 +21,12 @@
     font-style: normal;
   }
   @font-face {
+    font-family: 'Avenir Next Cyr';
+    src: url('assets/AvenirNextCyr-Bold.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+  }
+  @font-face {
     font-family: 'Didot';
     src: url('assets/Didot.ttf') format('truetype');
     font-weight: 400;
@@ -191,6 +197,102 @@
   #frame.active .cloud-base,
   #frame.active .cloud { filter: brightness(0.35) contrast(1.5) saturate(0.5); }
 
+  /* Storm clouds — slide in from sides on active */
+  .storm-cloud {
+    position: absolute;
+    z-index: 2;
+    pointer-events: none;
+    opacity: 0;
+    /* Stronger ease-out: sharp takeoff, long gentle deceleration */
+    transition: transform 3s cubic-bezier(0.16, 1, 0.3, 1), opacity 2s ease-in-out, filter 2s ease-in-out;
+    /* Dramatic storm look: darker, cooler, higher contrast, soft shadow */
+    filter:
+      brightness(0.45)
+      contrast(1.7)
+      saturate(0.7)
+      hue-rotate(200deg)
+      drop-shadow(0 25px 60px rgba(0, 0, 25, 0.8));
+  }
+
+
+  .storm-cloud img {
+    display: block;
+    max-width: none;
+    height: auto;
+  }
+
+  /* Left side storm clouds — start off left edge */
+  .storm-cloud-left-1 {
+    top: -8%;
+    left: 0;
+    transform: translateX(-2000px);
+    transition-duration: 2.8s, 2s, 2s; /* fastest */
+  }
+  .storm-cloud-left-1 img {
+    width: 2300px;
+    animation: storm-drift-right-1 22s ease-in-out infinite alternate;
+  }
+
+  .storm-cloud-left-2 {
+    top: 38%;
+    left: 0;
+    transform: translateX(-2200px);
+    transition-duration: 3.8s, 2s, 2s; /* slowest */
+  }
+  .storm-cloud-left-2 img {
+    width: 2500px;
+    animation: storm-drift-right-2 35s ease-in-out infinite alternate;
+  }
+
+  /* Right side storm clouds — start off right edge */
+  .storm-cloud-right-1 {
+    top: 12%;
+    right: 0;
+    transform: translateX(2000px);
+    transition-duration: 3.2s, 2s, 2s;
+  }
+  .storm-cloud-right-1 img {
+    width: 2400px;
+    animation: storm-drift-left-1 27s ease-in-out infinite alternate;
+  }
+
+  .storm-cloud-right-2 {
+    top: 62%;
+    right: 0;
+    transform: translateX(2100px);
+    transition-duration: 3.5s, 2s, 2s;
+  }
+  .storm-cloud-right-2 img {
+    width: 2200px;
+    animation: storm-drift-left-2 40s ease-in-out infinite alternate;
+  }
+
+  @keyframes storm-drift-right-1 {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(220px); }
+  }
+  @keyframes storm-drift-right-2 {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(300px); }
+  }
+  @keyframes storm-drift-left-1 {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-260px); }
+  }
+  @keyframes storm-drift-left-2 {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-340px); }
+  }
+
+  /* On active — slide toward center and fade in */
+  #frame.active .storm-cloud {
+    opacity: 0.95;
+  }
+  #frame.active .storm-cloud-left-1 { transform: translateX(-200px); }
+  #frame.active .storm-cloud-left-2 { transform: translateX(-150px); }
+  #frame.active .storm-cloud-right-1 { transform: translateX(200px); }
+  #frame.active .storm-cloud-right-2 { transform: translateX(180px); }
+
   /* ============ HAND ============ */
 
   #hand-canvas {
@@ -245,8 +347,8 @@
   }
 
   .circle-btn.active {
-    border-color: rgba(150, 200, 255, 0.9);
-    box-shadow: 0 0 40px rgba(150, 200, 255, 0.4);
+    border-color: transparent;
+    box-shadow: none;
   }
 
   /* Tap hand icon inside button */
@@ -315,7 +417,10 @@
   }
 
   .circle-btn.active::before,
-  .circle-btn.active::after { animation-play-state: paused; opacity: 0; }
+  .circle-btn.active::after {
+    animation: none;
+    opacity: 0;
+  }
 
   /* Touch text */
   .touch-text {
@@ -401,7 +506,7 @@
     color: #fff;
     line-height: 1.0;
     margin-bottom: 5px;
-    letter-spacing: 3px;
+    letter-spacing: -2.9px;
     text-align: center;
     height: 150px;
     display: flex;
@@ -417,7 +522,7 @@
     font-style: normal;
     color: rgba(255, 255, 255, 0.85);
     line-height: 1.2;
-    margin-bottom: 200px;
+    margin-bottom: 350px;
     text-align: center;
     letter-spacing: 2px;
     height: 110px;
@@ -436,6 +541,72 @@
   .title-main,
   .title-sub {
     transition: filter 0.5s ease-in-out, text-shadow 0.5s ease-in-out;
+  }
+
+  /* Active-state intro (two lines, shown only when pressed) */
+  .active-intro {
+    display: none;
+    text-align: center;
+    margin-bottom: 40px;
+  }
+  #frame.active .active-intro {
+    display: block;
+  }
+
+  .intro-line {
+    font-family: 'Avenir Next Cyr', 'Inter', sans-serif;
+    font-weight: 500;
+    font-size: 82px;
+    color: #fff;
+    text-transform: uppercase;
+    line-height: 1.0;
+    letter-spacing: 1px;
+    transition: filter 0.5s ease-in-out, text-shadow 0.5s ease-in-out;
+  }
+  .intro-line + .intro-line { margin-top: 4px; }
+
+  /* Second line of the big active title (EXHIBITION / IZSTĀDE) */
+  .title-main-line2 {
+    display: none;
+    font-family: 'Avenir Next Cyr', 'Inter', sans-serif;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1.0;
+    text-align: center;
+    letter-spacing: -1px;
+    height: 150px;
+    align-items: center;
+    justify-content: center;
+    transition: filter 0.5s ease-in-out, text-shadow 0.5s ease-in-out;
+  }
+  #frame.active .title-main-line2 {
+    display: flex;
+    font-size: 150px;
+  }
+
+  /* Active-state overrides for title-main (first huge line: IMMERSIVE / IMERSĪVA) */
+  #frame.active .title-main {
+    font-family: 'Avenir Next Cyr', 'Inter', sans-serif;
+    font-weight: 700;
+    font-size: 150px;
+    letter-spacing: -1px;
+    text-transform: uppercase;
+  }
+
+  /* Active-state overrides for title-sub (Michelangelo — El tocco dell'Eterno) */
+  #frame.active .title-sub {
+    font-family: 'Didot', 'Georgia', serif;
+    font-weight: 400;
+    font-size: 50px;
+    letter-spacing: 1px;
+    margin-bottom: 80px;
+    text-transform: none;
+  }
+
+  .intro-line.scrambling,
+  .title-main-line2.scrambling {
+    filter: blur(8px);
+    text-shadow: 0 0 30px rgba(150, 180, 255, 0.6), 0 0 60px rgba(120, 150, 255, 0.4);
   }
 
   /* Glitch effect */
@@ -514,8 +685,9 @@
 
   .info-btn {
     position: absolute;
-    bottom: 50px;
-    right: 65px;
+    bottom: 284px; /* 50 (padding) + 130 (qr) + 10 (gap) + 24 (label) + 70 (spacing) */
+    left: 50%;
+    transform: translateX(-50%);
     width: 50px;
     height: 50px;
     border-radius: 50%;
@@ -747,11 +919,16 @@
     margin-top: 20px;
   }
 
-  /* Hide touch text and lang button when active */
+  /* Hide touch text, lang button, and info button when active */
   #frame.active .touch-text,
-  #frame.active .lang-btn {
+  #frame.active .lang-btn,
+  #frame.active .info-btn {
     opacity: 0;
     pointer-events: none;
+  }
+
+  .info-btn {
+    transition: opacity 0.5s ease-in-out;
   }
 
   /* ============ PARTICLES ============ */
@@ -800,6 +977,12 @@
   <div class="cloud cloud-2"><img src="assets/Cloud-17.png" alt=""></div>
   <div class="cloud cloud-3"><img src="assets/Cloud-25.png" alt=""></div>
 
+  <!-- Storm clouds — slide in from sides on active -->
+  <div class="storm-cloud storm-cloud-left-1"><img src="assets/Cloud-17.png" alt=""></div>
+  <div class="storm-cloud storm-cloud-left-2"><img src="assets/Cloud-25.png" alt=""></div>
+  <div class="storm-cloud storm-cloud-right-1"><img src="assets/Cloud-05.png" alt=""></div>
+  <div class="storm-cloud storm-cloud-right-2"><img src="assets/Cloud-17.png" alt=""></div>
+
   <!-- Cracks texture overlay -->
   <!-- Hand -->
   <canvas id="hand-canvas" width="900" height="1500"></canvas>
@@ -833,7 +1016,13 @@
 
   <!-- Bottom section -->
   <div class="bottom-section">
+    <!-- Active-only intro: two lines, shown when pressed -->
+    <div class="active-intro">
+      <div class="intro-line title-glitch" id="introLine1" data-text=""></div>
+      <div class="intro-line title-glitch" id="introLine2" data-text=""></div>
+    </div>
     <div class="title-main title-glitch" id="titleMain" data-text="Michelangelo">Michelangelo</div>
+    <div class="title-main-line2 title-glitch" id="titleMainLine2" data-text=""></div>
     <div class="title-sub title-glitch" id="titleSub" data-text="— El tocco dell'Eterno">— El tocco dell'Eterno</div>
     <div class="qr-area">
       <span class="qr-label" id="ticketsLabel">Tickets</span>
@@ -1006,6 +1195,9 @@
 
   const titleMain = document.getElementById('titleMain');
   const titleSub = document.getElementById('titleSub');
+  const titleMainLine2 = document.getElementById('titleMainLine2');
+  const introLine1 = document.getElementById('introLine1');
+  const introLine2 = document.getElementById('introLine2');
 
   // --- Text Scramble (airport flip board effect) ---
   class TextScramble {
@@ -1061,6 +1253,9 @@
 
   const fxMain = new TextScramble(titleMain);
   const fxSub = new TextScramble(titleSub);
+  const fxMainLine2 = new TextScramble(titleMainLine2);
+  const fxIntro1 = new TextScramble(introLine1);
+  const fxIntro2 = new TextScramble(introLine2);
 
   // --- Flash overlay ---
   const flashOverlay = document.createElement('div');
@@ -1097,10 +1292,22 @@
     frame.classList.add('active');
     isActive = true;
     if (isPressedInput) isPressedInput.value = true;
+    const intro1Text = lang === 'lv' ? 'IENĀC' : 'ENTER THE';
+    const intro2Text = lang === 'lv' ? '360° PIEREDZĒ' : '360° EXPERIENCE';
+    const mainText  = lang === 'lv' ? 'IMERSĪVA' : 'IMMERSIVE';
+    const main2Text = lang === 'lv' ? 'IZSTĀDE'  : 'EXHIBITION';
+    const subText   = "Michelangelo — El tocco dell'Eterno";
+
+    introLine1.classList.add('scrambling');
+    introLine2.classList.add('scrambling');
     titleMain.classList.add('scrambling');
+    titleMainLine2.classList.add('scrambling');
     titleSub.classList.add('scrambling');
-    fxMain.setText(lang === 'lv' ? 'IESPAIDĪGA' : 'IMMERSIVE').then(() => titleMain.classList.remove('scrambling'));
-    fxSub.setText(lang === 'lv' ? 'IZSTĀDE' : 'EXHIBITION').then(() => titleSub.classList.remove('scrambling'));
+    fxIntro1.setText(intro1Text).then(() => introLine1.classList.remove('scrambling'));
+    fxIntro2.setText(intro2Text).then(() => introLine2.classList.remove('scrambling'));
+    fxMain.setText(mainText).then(() => titleMain.classList.remove('scrambling'));
+    fxMainLine2.setText(main2Text).then(() => titleMainLine2.classList.remove('scrambling'));
+    fxSub.setText(subText).then(() => titleSub.classList.remove('scrambling'));
     triggerFlashes();
   }
 
@@ -1114,10 +1321,16 @@
     isActive = false;
     stopFlashes();
     if (isPressedInput) isPressedInput.value = false;
+    introLine1.classList.add('scrambling');
+    introLine2.classList.add('scrambling');
     titleMain.classList.add('scrambling');
+    titleMainLine2.classList.add('scrambling');
     titleSub.classList.add('scrambling');
+    fxIntro1.setText('').then(() => introLine1.classList.remove('scrambling'));
+    fxIntro2.setText('').then(() => introLine2.classList.remove('scrambling'));
     fxMain.setText('Michelangelo').then(() => titleMain.classList.remove('scrambling'));
-    fxSub.setText('— El tocco dell\'Eterno').then(() => titleSub.classList.remove('scrambling'));
+    fxMainLine2.setText('').then(() => titleMainLine2.classList.remove('scrambling'));
+    fxSub.setText("— El tocco dell'Eterno").then(() => titleSub.classList.remove('scrambling'));
   }
 
   btn.addEventListener('mousedown', activate);
