@@ -205,12 +205,8 @@
     opacity: 0;
     /* Stronger ease-out: sharp takeoff, long gentle deceleration */
     transition: transform 3s cubic-bezier(0.16, 1, 0.3, 1), opacity 2s ease-in-out, filter 2s ease-in-out;
-    /* Dramatic storm look — drop-shadow removed, it was the most expensive part */
-    filter:
-      brightness(0.45)
-      contrast(1.7)
-      saturate(0.7)
-      hue-rotate(200deg);
+    /* Dramatic storm look — keep it cheap: only brightness + contrast */
+    filter: brightness(0.5) contrast(1.6);
   }
 
 
@@ -987,7 +983,7 @@
   <canvas id="hand-canvas" width="900" height="1500"></canvas>
 
   <!-- Cracks texture overlay -->
-  <div style="position:absolute;inset:0;z-index:2;pointer-events:none;opacity:1;mix-blend-mode:soft-light;background:url('assets/texture-cracks.webp') center/cover no-repeat;"></div>
+  <div style="position:absolute;inset:0;z-index:2;pointer-events:none;opacity:0.35;background:url('assets/texture-cracks.webp') center/cover no-repeat;"></div>
 
   <!-- Bottom gradient -->
   <div class="bottom-gradient"></div>
@@ -1264,10 +1260,11 @@
   frame.appendChild(flashOverlay);
 
   // --- Sky flash overlay (localized radial gradients at random positions) ---
-  // screen blend + heavy blur + low opacity = the gradient circle dissolves into a soft
-  // brightness bloom that feels like light spreading inside the clouds.
+  // No CSS filter — a 55px blur on a full-screen layer triggers huge compositor
+  // buffers on mobile GPUs and can crash the page. We approximate soft edges via
+  // a gradient with many gentle color stops.
   const skyFlashOverlay = document.createElement('div');
-  skyFlashOverlay.style.cssText = 'position:absolute;inset:-120px;opacity:0;z-index:6;pointer-events:none;transition:opacity 0.06s;mix-blend-mode:screen;filter:blur(55px);';
+  skyFlashOverlay.style.cssText = 'position:absolute;inset:0;opacity:0;z-index:6;pointer-events:none;transition:opacity 0.06s;mix-blend-mode:screen;';
   frame.appendChild(skyFlashOverlay);
 
   // Random positions across the whole screen
@@ -1297,17 +1294,22 @@
 
   function randomSkyFlash() {
     const pos = skyFlashPositions[Math.floor(Math.random() * skyFlashPositions.length)];
-    // Bias toward small: most flashes stay around the base size, occasional huge ones
-    // pow(rand, 1.8) concentrates values near 0 → most multipliers are small, rare ones approach max
     const sizeMul = 1 + Math.pow(Math.random(), 1.8) * 2.2; // ≈ 1.0 … 3.2
     const radius = 350 * sizeMul;
-    // Larger flashes read as brighter so we taper intensity a bit for the huge ones
-    const baseIntensity = 0.14 + Math.random() * 0.16;
-    const intensity = baseIntensity * (0.7 + 0.3 / sizeMul); // smaller = fuller brightness
+    const baseIntensity = 0.22 + Math.random() * 0.2;
+    const intensity = baseIntensity * (0.7 + 0.3 / sizeMul);
     const myGen = ++flashGen;
 
+    // Many soft stops so the edge blends out gradually without needing a CSS blur filter
     skyFlashOverlay.style.background =
-      `radial-gradient(circle ${radius}px at ${pos.x} ${pos.y}, rgba(230,240,255,${intensity}) 0%, rgba(200,220,255,${intensity * 0.55}) 35%, rgba(170,200,255,${intensity * 0.2}) 60%, rgba(150,190,255,0) 85%)`;
+      `radial-gradient(circle ${radius}px at ${pos.x} ${pos.y},
+        rgba(230,240,255,${intensity}) 0%,
+        rgba(220,235,255,${intensity * 0.82}) 10%,
+        rgba(205,225,255,${intensity * 0.6}) 22%,
+        rgba(190,215,255,${intensity * 0.4}) 36%,
+        rgba(175,205,255,${intensity * 0.22}) 52%,
+        rgba(160,195,255,${intensity * 0.1}) 70%,
+        rgba(150,190,255,0) 100%)`;
 
     // Strobe: rapid flicker in the first ~130ms — matches how real lightning fires
     // multiple return strokes in quick succession before fading out.
@@ -1551,7 +1553,10 @@
     return { segs, subs };
   }
 
+  const MAX_BOLTS = 8;
   function spawnBolt(isMega = false) {
+    // Safety cap — if something backs up, don't let the array explode
+    if (bolts.length >= MAX_BOLTS) return;
     const startAngle = Math.random() * Math.PI * 2;
     const arcExtent = isMega
       ? (Math.PI * (0.65 + Math.random() * 0.5)) * (Math.random() < 0.5 ? 1 : -1)   // ~120°–180°
