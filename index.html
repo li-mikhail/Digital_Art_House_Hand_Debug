@@ -685,7 +685,7 @@
 
   .info-btn {
     position: absolute;
-    bottom: 284px; /* 50 (padding) + 130 (qr) + 10 (gap) + 24 (label) + 70 (spacing) */
+    bottom: 254px; /* 50 (padding) + 130 (qr) + 10 (gap) + 24 (label) + 40 (spacing) */
     left: 50%;
     transform: translateX(-50%);
     width: 50px;
@@ -1257,14 +1257,91 @@
   const fxIntro1 = new TextScramble(introLine1);
   const fxIntro2 = new TextScramble(introLine2);
 
-  // --- Flash overlay ---
+  // --- Flash overlay (full-screen for initial burst) ---
+  // mix-blend-mode: screen — the white layer additively brightens whatever is underneath
+  // (sky/clouds/particles) instead of sitting on top as a flat white wash.
   const flashOverlay = document.createElement('div');
-  flashOverlay.style.cssText = 'position:absolute;inset:0;background:#fff;opacity:0;z-index:6;pointer-events:none;transition:opacity 0.08s;';
+  flashOverlay.style.cssText = 'position:absolute;inset:0;background:#fff;opacity:0;z-index:6;pointer-events:none;transition:opacity 0.08s;mix-blend-mode:screen;';
   frame.appendChild(flashOverlay);
+
+  // --- Sky flash overlay (localized radial gradients at random positions) ---
+  // screen blend + heavy blur + low opacity = the gradient circle dissolves into a soft
+  // brightness bloom that feels like light spreading inside the clouds.
+  const skyFlashOverlay = document.createElement('div');
+  skyFlashOverlay.style.cssText = 'position:absolute;inset:-120px;opacity:0;z-index:6;pointer-events:none;transition:opacity 0.06s;mix-blend-mode:screen;filter:blur(55px);';
+  frame.appendChild(skyFlashOverlay);
+
+  // Random positions across the whole screen
+  const skyFlashPositions = [
+    // Upper area
+    { x: '15%', y: '8%'  },
+    { x: '85%', y: '10%' },
+    { x: '50%', y: '5%'  },
+    { x: '35%', y: '18%' },
+    { x: '70%', y: '20%' },
+    // Middle area
+    { x: '10%', y: '40%' },
+    { x: '90%', y: '38%' },
+    { x: '25%', y: '50%' },
+    { x: '75%', y: '48%' },
+    { x: '50%', y: '42%' },
+    // Lower area
+    { x: '15%', y: '72%' },
+    { x: '85%', y: '70%' },
+    { x: '45%', y: '85%' },
+    { x: '60%', y: '80%' },
+    { x: '25%', y: '90%' },
+  ];
+
+  // Generation counter — lets us cancel timeouts from older flashes when a new one kicks in
+  let flashGen = 0;
+
+  function randomSkyFlash() {
+    const pos = skyFlashPositions[Math.floor(Math.random() * skyFlashPositions.length)];
+    // Bias toward small: most flashes stay around the base size, occasional huge ones
+    // pow(rand, 1.8) concentrates values near 0 → most multipliers are small, rare ones approach max
+    const sizeMul = 1 + Math.pow(Math.random(), 1.8) * 2.2; // ≈ 1.0 … 3.2
+    const radius = 350 * sizeMul;
+    // Larger flashes read as brighter so we taper intensity a bit for the huge ones
+    const baseIntensity = 0.14 + Math.random() * 0.16;
+    const intensity = baseIntensity * (0.7 + 0.3 / sizeMul); // smaller = fuller brightness
+    const myGen = ++flashGen;
+
+    skyFlashOverlay.style.background =
+      `radial-gradient(circle ${radius}px at ${pos.x} ${pos.y}, rgba(230,240,255,${intensity}) 0%, rgba(200,220,255,${intensity * 0.55}) 35%, rgba(170,200,255,${intensity * 0.2}) 60%, rgba(150,190,255,0) 85%)`;
+
+    // Strobe: rapid flicker in the first ~130ms — matches how real lightning fires
+    // multiple return strokes in quick succession before fading out.
+    const strobe = [
+      { t: 0,   op: '1' },
+      { t: 22,  op: '0.18' },
+      { t: 42,  op: '1' },
+      { t: 65,  op: '0.25' },
+      { t: 88,  op: '0.95' },
+      { t: 112, op: '0.4' },
+      { t: 132, op: '0.85' },
+    ];
+
+    strobe.forEach(({ t, op }) => {
+      setTimeout(() => {
+        if (myGen !== flashGen) return;
+        skyFlashOverlay.style.transition = 'none';
+        skyFlashOverlay.style.opacity = op;
+      }, t);
+    });
+
+    // Smooth fade to 0 after the strobe
+    setTimeout(() => {
+      if (myGen !== flashGen) return;
+      skyFlashOverlay.style.transition = 'opacity 0.25s ease-out';
+      skyFlashOverlay.style.opacity = '0';
+    }, 160 + Math.random() * 50);
+  }
 
   let flashInterval = null;
 
   function triggerFlashes() {
+    // Initial press burst — full-screen white, keeps its punch
     const delays = [50, 200, 400, 1400, 1550, 1750];
     delays.forEach(d => {
       setTimeout(() => {
@@ -1273,17 +1350,56 @@
       }, d);
     });
 
-    // Random flashes while holding (rare)
-    flashInterval = setInterval(() => {
+    scheduleNextFlashEvent();
+  }
+
+  // Recursive scheduler — produces truly random gaps + random event sizes,
+  // alternating between quiet periods and storm bursts like real weather.
+  function scheduleNextFlashEvent() {
+    if (!isActive) return;
+
+    // Pick a "mood" for the next gap
+    const mood = Math.random();
+    let delay;
+    if (mood < 0.35) {
+      // Long quiet: 5–12 s — the sky goes still
+      delay = 5000 + Math.random() * 7000;
+    } else if (mood < 0.85) {
+      // Normal gap: 1.2–4 s
+      delay = 1200 + Math.random() * 2800;
+    } else {
+      // Close follow-up: 0.3–1.2 s — chained events
+      delay = 300 + Math.random() * 900;
+    }
+
+    flashInterval = setTimeout(() => {
       if (!isActive) return;
-      if (Math.random() > 0.15) return; // 15% chance each check
-      flashOverlay.style.opacity = String(0.3 + Math.random() * 0.5);
-      setTimeout(() => { flashOverlay.style.opacity = '0'; }, 40 + Math.random() * 40);
-    }, 2500 + Math.random() * 3500);
+
+      // Pick an event type
+      const roll = Math.random();
+      if (roll < 0.55) {
+        // 55% — single flash
+        randomSkyFlash();
+      } else if (roll < 0.86) {
+        // 31% — short chain 2–4 flashes
+        const n = 2 + Math.floor(Math.random() * 3);
+        for (let i = 0; i < n; i++) {
+          setTimeout(randomSkyFlash, i * (70 + Math.random() * 200));
+        }
+      } else {
+        // 14% — big burst 5–10 flashes across the sky
+        const n = 5 + Math.floor(Math.random() * 6);
+        for (let i = 0; i < n; i++) {
+          setTimeout(randomSkyFlash, i * (60 + Math.random() * 160));
+        }
+      }
+
+      scheduleNextFlashEvent();
+    }, delay);
   }
 
   function stopFlashes() {
-    if (flashInterval) { clearInterval(flashInterval); flashInterval = null; }
+    if (flashInterval) { clearTimeout(flashInterval); flashInterval = null; }
   }
 
   function activate() {
@@ -1375,7 +1491,7 @@
   }
   drawParticles();
 
-  // --- Plasma Energy Effect ---
+  // --- Premium lightning storm — thin, fast, layered with afterglow + mega strikes ---
   const beamCanvas = document.getElementById('beam-canvas');
   const ctx = beamCanvas.getContext('2d');
   let isActive = false;
@@ -1385,25 +1501,163 @@
   const centerX = 540;
   const centerY = 806;
 
-  // Expanding energy rings
-  const rings = [];
-  const MAX_RINGS = 5;
+  const bolts = [];
+  const afterglows = [];
+  const endpointFlashes = [];
+  let nextBoltTime = 0;
+  let nextMegaTime = 1.2;
 
-  // Orbiting energy sparks
-  const orbitSparks = [];
-  for (let i = 0; i < 30; i++) {
-    orbitSparks.push({
-      angle: Math.random() * Math.PI * 2,
-      radius: 20 + Math.random() * 100,
-      speed: (1 + Math.random() * 3) * (Math.random() > 0.5 ? 1 : -1),
-      size: 1 + Math.random() * 3,
-      opacity: 0.3 + Math.random() * 0.5,
-      phase: Math.random() * Math.PI * 2,
-      pulseSpeed: 2 + Math.random() * 3,
+  // Circle ring radius — bolts dance AROUND this radius
+  const RING_RADIUS = 62;
+
+  // Build a jagged arc along the ring: travels from startAngle to startAngle+arcExtent,
+  // with radial (in/out) jitter rather than linear perpendicular jitter
+  function buildJaggedArc(startAngle, arcExtent, baseRadius, segCount, radialJitter) {
+    const pts = [];
+    for (let s = 0; s <= segCount; s++) {
+      const frac = s / segCount;
+      const envelope = Math.sin(frac * Math.PI);
+      const jitter = (Math.random() - 0.5) * radialJitter * envelope;
+      const theta = startAngle + arcExtent * frac;
+      const r = baseRadius + jitter;
+      pts.push({
+        x: Math.cos(theta) * r,
+        y: Math.sin(theta) * r,
+      });
+    }
+    return pts;
+  }
+
+  // Recursive branching — branches are SHORTER arcs possibly curving off in a different direction
+  function buildArcBolt(startAngle, arcExtent, baseRadius, depth) {
+    const segCount = 10 + Math.floor(Math.random() * 5);
+    const segs = buildJaggedArc(startAngle, arcExtent, baseRadius, segCount, 22);
+
+    const subs = [];
+    if (depth < 2) {
+      const count = depth === 0
+        ? (Math.random() < 0.8 ? 2 : (Math.random() < 0.5 ? 3 : 1))
+        : (Math.random() < 0.55 ? 1 : 0);
+      for (let i = 0; i < count; i++) {
+        // Fork at a random point along the parent arc
+        const forkFrac = 0.25 + Math.random() * 0.5;
+        const forkAngle = startAngle + arcExtent * forkFrac;
+        // Sub-arc travels in a new direction — possibly reverses, possibly curves outward
+        const subExtent = arcExtent * (0.3 + Math.random() * 0.45) * (Math.random() < 0.4 ? -1 : 1);
+        // Sub-arc may sit at a slightly different radius
+        const subRadius = baseRadius + (Math.random() - 0.5) * 24;
+        subs.push(buildArcBolt(forkAngle, subExtent, subRadius, depth + 1));
+      }
+    }
+    return { segs, subs };
+  }
+
+  function spawnBolt(isMega = false) {
+    const startAngle = Math.random() * Math.PI * 2;
+    const arcExtent = isMega
+      ? (Math.PI * (0.65 + Math.random() * 0.5)) * (Math.random() < 0.5 ? 1 : -1)   // ~120°–180°
+      : (Math.PI * (0.22 + Math.random() * 0.45)) * (Math.random() < 0.5 ? 1 : -1); // ~40°–120°
+    // Most bolts sit just outside the ring; some dip inside
+    const baseRadius = RING_RADIUS + (Math.random() - 0.3) * 22;
+    const bolt = buildArcBolt(startAngle, arcExtent, baseRadius, 0);
+    bolts.push({
+      bolt,
+      age: 0,
+      maxAge: isMega ? 1.2 + Math.random() * 0.6 : 0.7 + Math.random() * 0.3,
+      width: isMega ? 1.4 : 0.9 + Math.random() * 0.4,
+      isMega,
+      flashed: false,
+    });
+    if (isMega && typeof randomSkyFlash === 'function') {
+      randomSkyFlash();
+    }
+  }
+
+  // Draw a portion of a polyline between tailFrac and headFrac (both 0..1 of path length)
+  function drawPolylinePortion(pts, tailFrac, headFrac, cx, cy, microJitter) {
+    if (tailFrac >= headFrac || pts.length < 2) return;
+    const n = pts.length - 1; // number of segments
+    const tailGlobal = Math.max(0, Math.min(n, tailFrac * n));
+    const headGlobal = Math.max(0, Math.min(n, headFrac * n));
+    const jamp = microJitter ? 1.0 : 0;
+
+    ctx.beginPath();
+    let started = false;
+
+    for (let i = 0; i < n; i++) {
+      const segStart = i;
+      const segEnd = i + 1;
+      if (segEnd <= tailGlobal) continue;
+      if (segStart >= headGlobal) break;
+
+      const clipStart = Math.max(segStart, tailGlobal);
+      const clipEnd = Math.min(segEnd, headGlobal);
+      const tStart = clipStart - segStart;
+      const tEnd = clipEnd - segStart;
+
+      const dx = pts[i + 1].x - pts[i].x;
+      const dy = pts[i + 1].y - pts[i].y;
+      const x0 = pts[i].x + dx * tStart;
+      const y0 = pts[i].y + dy * tStart;
+      const x1 = pts[i].x + dx * tEnd;
+      const y1 = pts[i].y + dy * tEnd;
+
+      if (!started) {
+        ctx.moveTo(cx + x0 + (Math.random() - 0.5) * jamp, cy + y0 + (Math.random() - 0.5) * jamp);
+        started = true;
+      }
+      ctx.lineTo(cx + x1 + (Math.random() - 0.5) * jamp, cy + y1 + (Math.random() - 0.5) * jamp);
+    }
+    ctx.stroke();
+  }
+
+  function walkBolt(bolt, fn, depth = 0) {
+    fn(bolt.segs, depth);
+    for (const sub of bolt.subs) walkBolt(sub, fn, depth + 1);
+  }
+
+  function strokeBoltThin(bolt, width, alpha, tailFrac, headFrac) {
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // Pass 1: wide electric-blue halo
+    ctx.strokeStyle = `rgba(60, 150, 255, ${alpha * 0.5})`;
+    ctx.shadowColor = 'rgba(100, 180, 255, 0.95)';
+    ctx.shadowBlur = 14;
+    walkBolt(bolt, (segs, d) => {
+      ctx.lineWidth = width * (d === 0 ? 5 : d === 1 ? 3 : 2);
+      drawPolylinePortion(segs, tailFrac, headFrac, centerX, centerY, true);
+    });
+
+    // Pass 2: light electric mid
+    ctx.strokeStyle = `rgba(150, 210, 255, ${alpha * 0.85})`;
+    ctx.shadowColor = 'rgba(120, 190, 255, 0.9)';
+    ctx.shadowBlur = 7;
+    walkBolt(bolt, (segs, d) => {
+      ctx.lineWidth = width * (d === 0 ? 2 : d === 1 ? 1.2 : 0.9);
+      drawPolylinePortion(segs, tailFrac, headFrac, centerX, centerY, true);
+    });
+
+    // Pass 3: hot white-blue core
+    ctx.strokeStyle = `rgba(240, 250, 255, ${alpha})`;
+    ctx.shadowBlur = 0;
+    walkBolt(bolt, (segs, d) => {
+      ctx.lineWidth = width * (d === 0 ? 0.9 : d === 1 ? 0.7 : 0.5);
+      drawPolylinePortion(segs, tailFrac, headFrac, centerX, centerY, true);
     });
   }
 
-  let lastRingTime = 0;
+  function strokeAfterglow(bolt, alpha) {
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = `rgba(80, 160, 255, ${alpha * 0.7})`;
+    ctx.shadowColor = 'rgba(100, 180, 255, 0.8)';
+    ctx.shadowBlur = 10;
+    walkBolt(bolt, (segs, d) => {
+      ctx.lineWidth = (d === 0 ? 2 : 1.4);
+      drawPolylinePortion(segs, 0, 1, centerX, centerY, false);
+    });
+  }
 
   function drawPlasma() {
     requestAnimationFrame(drawPlasma);
@@ -1419,68 +1673,104 @@
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
 
-    // === EXPANDING RINGS (spawn periodically) ===
-    if (isActive && time - lastRingTime > 0.4) {
-      lastRingTime = time;
-      rings.push({ radius: 5, opacity: 0.7, width: 2.5 });
-      if (rings.length > MAX_RINGS) rings.shift();
+    // === CONSTANT CORE GLOW (electric blue) ===
+    const breath = 0.92 + Math.sin(time * 2.5) * 0.08;
+    const coreSize = 105 * beamProgress * breath;
+    const core = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, coreSize);
+    core.addColorStop(0, `rgba(235, 250, 255, ${0.98 * beamProgress})`);
+    core.addColorStop(0.1, `rgba(170, 220, 255, ${0.78 * beamProgress})`);
+    core.addColorStop(0.28, `rgba(90, 175, 255, ${0.45 * beamProgress})`);
+    core.addColorStop(0.55, `rgba(50, 135, 255, ${0.18 * beamProgress})`);
+    core.addColorStop(0.8, `rgba(35, 110, 240, 0.07)`);
+    core.addColorStop(1, 'rgba(25, 95, 230, 0)');
+    ctx.fillStyle = core;
+    ctx.fillRect(centerX - coreSize, centerY - coreSize, coreSize * 2, coreSize * 2);
+
+    // === SPAWN BOLTS — slower, smoother ===
+    if (isActive) {
+      if (time >= nextBoltTime) {
+        spawnBolt(false);
+        nextBoltTime = time + 0.35 + Math.random() * 0.45; // every 350–800ms
+      }
+      if (time >= nextMegaTime) {
+        spawnBolt(true);
+        nextMegaTime = time + 2.5 + Math.random() * 2.5;
+      }
     }
 
-    for (let i = rings.length - 1; i >= 0; i--) {
-      const ring = rings[i];
-      ring.radius += 2.5;
-      ring.opacity *= 0.97;
-      ring.width *= 0.98;
+    // === UPDATE & DRAW BOLTS (traveling dash animation) ===
+    for (let i = bolts.length - 1; i >= 0; i--) {
+      const b = bolts[i];
+      b.age += 0.032;
+      if (b.age >= b.maxAge) {
+        // Queue a faint afterglow of the full path
+        afterglows.push({
+          bolt: b.bolt,
+          age: 0,
+          life: 0.22,
+          initialAlpha: b.isMega ? 0.45 : 0.28,
+        });
+        bolts.splice(i, 1);
+        continue;
+      }
+      const lifeFrac = b.age / b.maxAge;
 
-      if (ring.opacity < 0.01) { rings.splice(i, 1); continue; }
+      // Head progresses 0→1 over first 70% of life, tail follows delayed by 30%
+      // Result: a dash travels along the path from start to end
+      const head = Math.min(lifeFrac / 0.7, 1);
+      const tail = Math.max(0, (lifeFrac - 0.3) / 0.7);
 
-      const r = ring.radius * beamProgress;
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, r, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(160, 200, 255, ${ring.opacity * beamProgress})`;
-      ctx.lineWidth = ring.width * beamProgress;
-      ctx.shadowColor = 'rgba(140, 180, 255, 0.4)';
-      ctx.shadowBlur = 15 * beamProgress;
-      ctx.stroke();
+      // Trigger endpoint flash when head arrives at the destination
+      if (!b.flashed && head >= 1) {
+        b.flashed = true;
+        const endpoint = b.bolt.segs[b.bolt.segs.length - 1];
+        endpointFlashes.push({
+          x: endpoint.x,
+          y: endpoint.y,
+          age: 0,
+          life: 0.22,
+          size: b.isMega ? 18 : 11,
+        });
+      }
+
+      // Alpha stays mostly full, only drops near the very end
+      let alpha = lifeFrac < 0.85 ? 1 : 1 - (lifeFrac - 0.85) / 0.15;
+      // Light flicker for electric feel
+      alpha *= 0.78 + Math.random() * 0.22;
+      alpha *= beamProgress;
+      strokeBoltThin(b.bolt, b.width, alpha, tail, head);
     }
-    ctx.shadowBlur = 0;
 
-    // === ORBITING SPARKS ===
-    for (const sp of orbitSparks) {
-      sp.angle += sp.speed * 0.02;
-      const pulse = 0.7 + Math.sin(time * sp.pulseSpeed + sp.phase) * 0.3;
-      const r = sp.radius * beamProgress * pulse;
+    // === AFTERGLOWS (ghost trails after bolts die) ===
+    for (let i = afterglows.length - 1; i >= 0; i--) {
+      const ag = afterglows[i];
+      ag.age += 0.032;
+      if (ag.age >= ag.life) { afterglows.splice(i, 1); continue; }
+      const alpha = ag.initialAlpha * (1 - ag.age / ag.life) * beamProgress;
+      strokeAfterglow(ag.bolt, alpha);
+    }
 
-      const px = centerX + Math.cos(sp.angle) * r;
-      const py = centerY + Math.sin(sp.angle) * r;
-      const pSize = sp.size * beamProgress;
-
-      const grad = ctx.createRadialGradient(px, py, 0, px, py, pSize * 3);
-      grad.addColorStop(0, `rgba(200, 220, 255, ${sp.opacity * beamProgress})`);
-      grad.addColorStop(0.5, `rgba(150, 180, 255, ${sp.opacity * 0.3 * beamProgress})`);
-      grad.addColorStop(1, 'rgba(130, 160, 255, 0)');
+    // === ENDPOINT FLASHES (bright dots at bolt endpoints) ===
+    for (let i = endpointFlashes.length - 1; i >= 0; i--) {
+      const fl = endpointFlashes[i];
+      fl.age += 0.032;
+      if (fl.age >= fl.life) { endpointFlashes.splice(i, 1); continue; }
+      const lifeFrac = fl.age / fl.life;
+      const alpha = (1 - lifeFrac) * beamProgress;
+      const size = fl.size * (1 - lifeFrac * 0.3);
+      const px = centerX + fl.x;
+      const py = centerY + fl.y;
+      const grad = ctx.createRadialGradient(px, py, 0, px, py, size * 2);
+      grad.addColorStop(0, `rgba(240, 250, 255, ${alpha})`);
+      grad.addColorStop(0.35, `rgba(140, 200, 255, ${alpha * 0.6})`);
+      grad.addColorStop(1, 'rgba(60, 150, 255, 0)');
       ctx.fillStyle = grad;
-      ctx.fillRect(px - pSize * 3, py - pSize * 3, pSize * 6, pSize * 6);
+      ctx.fillRect(px - size * 2, py - size * 2, size * 4, size * 4);
     }
 
-    // === CENTER GLOW (pulsing) ===
-    const glowPulse = 0.8 + Math.sin(time * 3) * 0.2;
-    const glowSize = 80 * beamProgress * glowPulse;
-    const glow = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, glowSize);
-    glow.addColorStop(0, `rgba(220, 235, 255, ${0.8 * beamProgress})`);
-    glow.addColorStop(0.2, `rgba(170, 200, 255, ${0.4 * beamProgress})`);
-    glow.addColorStop(0.5, `rgba(140, 170, 255, ${0.15 * beamProgress})`);
-    glow.addColorStop(1, 'rgba(120, 150, 255, 0)');
-    ctx.fillStyle = glow;
-    ctx.fillRect(centerX - glowSize, centerY - glowSize, glowSize * 2, glowSize * 2);
-
-    // === STATIC ENERGY RING (subtle, always visible when active) ===
-    const staticR = 55 + Math.sin(time * 2) * 5;
-    ctx.beginPath();
-    ctx.arc(centerX, centerY, staticR * beamProgress, 0, Math.PI * 2);
-    ctx.strokeStyle = `rgba(180, 210, 255, ${0.15 * beamProgress})`;
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.lineCap = 'butt';
+    ctx.lineJoin = 'miter';
 
     ctx.restore();
   }
