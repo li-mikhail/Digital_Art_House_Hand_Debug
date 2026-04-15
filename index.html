@@ -205,13 +205,12 @@
     opacity: 0;
     /* Stronger ease-out: sharp takeoff, long gentle deceleration */
     transition: transform 3s cubic-bezier(0.16, 1, 0.3, 1), opacity 2s ease-in-out, filter 2s ease-in-out;
-    /* Dramatic storm look: darker, cooler, higher contrast, soft shadow */
+    /* Dramatic storm look — drop-shadow removed, it was the most expensive part */
     filter:
       brightness(0.45)
       contrast(1.7)
       saturate(0.7)
-      hue-rotate(200deg)
-      drop-shadow(0 25px 60px rgba(0, 0, 25, 0.8));
+      hue-rotate(200deg);
   }
 
 
@@ -968,27 +967,27 @@
 
   <!-- Main cloud background -->
   <div class="cloud-base">
-    <img src="assets/clouds_0.png" alt="">
-    <img src="assets/clouds_0.png" alt="">
+    <img src="assets/clouds_0.webp" alt="">
+    <img src="assets/clouds_0.webp" alt="">
   </div>
 
   <!-- Individual cloud overlays -->
-  <div class="cloud cloud-1"><img src="assets/Cloud-05.png" alt=""></div>
-  <div class="cloud cloud-2"><img src="assets/Cloud-17.png" alt=""></div>
-  <div class="cloud cloud-3"><img src="assets/Cloud-25.png" alt=""></div>
+  <div class="cloud cloud-1"><img src="assets/Cloud-05.webp" alt=""></div>
+  <div class="cloud cloud-2"><img src="assets/Cloud-17.webp" alt=""></div>
+  <div class="cloud cloud-3"><img src="assets/Cloud-25.webp" alt=""></div>
 
   <!-- Storm clouds — slide in from sides on active -->
-  <div class="storm-cloud storm-cloud-left-1"><img src="assets/Cloud-17.png" alt=""></div>
-  <div class="storm-cloud storm-cloud-left-2"><img src="assets/Cloud-25.png" alt=""></div>
-  <div class="storm-cloud storm-cloud-right-1"><img src="assets/Cloud-05.png" alt=""></div>
-  <div class="storm-cloud storm-cloud-right-2"><img src="assets/Cloud-17.png" alt=""></div>
+  <div class="storm-cloud storm-cloud-left-1"><img src="assets/Cloud-17.webp" alt=""></div>
+  <div class="storm-cloud storm-cloud-left-2"><img src="assets/Cloud-25.webp" alt=""></div>
+  <div class="storm-cloud storm-cloud-right-1"><img src="assets/Cloud-05.webp" alt=""></div>
+  <div class="storm-cloud storm-cloud-right-2"><img src="assets/Cloud-17.webp" alt=""></div>
 
   <!-- Cracks texture overlay -->
   <!-- Hand -->
   <canvas id="hand-canvas" width="900" height="1500"></canvas>
 
   <!-- Cracks texture overlay -->
-  <div style="position:absolute;inset:0;z-index:2;pointer-events:none;opacity:1;mix-blend-mode:soft-light;background:url('assets/texture-cracks.png') center/cover no-repeat;"></div>
+  <div style="position:absolute;inset:0;z-index:2;pointer-events:none;opacity:1;mix-blend-mode:soft-light;background:url('assets/texture-cracks.webp') center/cover no-repeat;"></div>
 
   <!-- Bottom gradient -->
   <div class="bottom-gradient"></div>
@@ -1458,7 +1457,7 @@
   const particleCanvas = document.getElementById('particle-canvas');
   const pCtx = particleCanvas.getContext('2d');
   const particles = [];
-  const PARTICLE_COUNT = 60;
+  const PARTICLE_COUNT = 30;
 
   for (let i = 0; i < PARTICLE_COUNT; i++) {
     particles.push({
@@ -1619,28 +1618,34 @@
   function strokeBoltThin(bolt, width, alpha, tailFrac, headFrac) {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-
-    // Pass 1: wide electric-blue halo
-    ctx.strokeStyle = `rgba(60, 150, 255, ${alpha * 0.5})`;
-    ctx.shadowColor = 'rgba(100, 180, 255, 0.95)';
-    ctx.shadowBlur = 14;
-    walkBolt(bolt, (segs, d) => {
-      ctx.lineWidth = width * (d === 0 ? 5 : d === 1 ? 3 : 2);
-      drawPolylinePortion(segs, tailFrac, headFrac, centerX, centerY, true);
-    });
-
-    // Pass 2: light electric mid
-    ctx.strokeStyle = `rgba(150, 210, 255, ${alpha * 0.85})`;
-    ctx.shadowColor = 'rgba(120, 190, 255, 0.9)';
-    ctx.shadowBlur = 7;
-    walkBolt(bolt, (segs, d) => {
-      ctx.lineWidth = width * (d === 0 ? 2 : d === 1 ? 1.2 : 0.9);
-      drawPolylinePortion(segs, tailFrac, headFrac, centerX, centerY, true);
-    });
-
-    // Pass 3: hot white-blue core
-    ctx.strokeStyle = `rgba(240, 250, 255, ${alpha})`;
+    // No shadowBlur — use additive stacked strokes to fake the glow.
+    // Canvas shadowBlur is software-blurred per stroke and very expensive on mobile GPUs,
+    // while stacked strokes go through GPU compositing fast.
     ctx.shadowBlur = 0;
+
+    // Pass 1: widest faint halo
+    ctx.strokeStyle = `rgba(60, 150, 255, ${alpha * 0.14})`;
+    walkBolt(bolt, (segs, d) => {
+      ctx.lineWidth = width * (d === 0 ? 12 : d === 1 ? 8 : 5);
+      drawPolylinePortion(segs, tailFrac, headFrac, centerX, centerY, true);
+    });
+
+    // Pass 2: softer blue halo
+    ctx.strokeStyle = `rgba(90, 170, 255, ${alpha * 0.28})`;
+    walkBolt(bolt, (segs, d) => {
+      ctx.lineWidth = width * (d === 0 ? 7 : d === 1 ? 4.5 : 3);
+      drawPolylinePortion(segs, tailFrac, headFrac, centerX, centerY, true);
+    });
+
+    // Pass 3: bright electric mid
+    ctx.strokeStyle = `rgba(150, 210, 255, ${alpha * 0.7})`;
+    walkBolt(bolt, (segs, d) => {
+      ctx.lineWidth = width * (d === 0 ? 2.5 : d === 1 ? 1.5 : 1);
+      drawPolylinePortion(segs, tailFrac, headFrac, centerX, centerY, true);
+    });
+
+    // Pass 4: hot white-blue core
+    ctx.strokeStyle = `rgba(240, 250, 255, ${alpha})`;
     walkBolt(bolt, (segs, d) => {
       ctx.lineWidth = width * (d === 0 ? 0.9 : d === 1 ? 0.7 : 0.5);
       drawPolylinePortion(segs, tailFrac, headFrac, centerX, centerY, true);
@@ -1650,9 +1655,14 @@
   function strokeAfterglow(bolt, alpha) {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.strokeStyle = `rgba(80, 160, 255, ${alpha * 0.7})`;
-    ctx.shadowColor = 'rgba(100, 180, 255, 0.8)';
-    ctx.shadowBlur = 10;
+    ctx.shadowBlur = 0;
+    // Wider faint pass + narrower brighter pass, no shadowBlur
+    ctx.strokeStyle = `rgba(90, 170, 255, ${alpha * 0.35})`;
+    walkBolt(bolt, (segs, d) => {
+      ctx.lineWidth = (d === 0 ? 6 : 4);
+      drawPolylinePortion(segs, 0, 1, centerX, centerY, false);
+    });
+    ctx.strokeStyle = `rgba(150, 200, 255, ${alpha * 0.7})`;
     walkBolt(bolt, (segs, d) => {
       ctx.lineWidth = (d === 0 ? 2 : 1.4);
       drawPolylinePortion(segs, 0, 1, centerX, centerY, false);
