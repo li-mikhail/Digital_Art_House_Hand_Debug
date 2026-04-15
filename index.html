@@ -205,8 +205,13 @@
     opacity: 0;
     /* Stronger ease-out: sharp takeoff, long gentle deceleration */
     transition: transform 3s cubic-bezier(0.16, 1, 0.3, 1), opacity 2s ease-in-out, filter 2s ease-in-out;
-    /* Dramatic storm look — keep it cheap: only brightness + contrast */
-    filter: brightness(0.5) contrast(1.6);
+    /* Dramatic storm look: darker, cooler, higher contrast, soft shadow */
+    filter:
+      brightness(0.45)
+      contrast(1.7)
+      saturate(0.7)
+      hue-rotate(200deg)
+      drop-shadow(0 25px 60px rgba(0, 0, 25, 0.8));
   }
 
 
@@ -983,7 +988,7 @@
   <canvas id="hand-canvas" width="900" height="1500"></canvas>
 
   <!-- Cracks texture overlay -->
-  <div style="position:absolute;inset:0;z-index:2;pointer-events:none;opacity:0.35;background:url('assets/texture-cracks.webp') center/cover no-repeat;"></div>
+  <div style="position:absolute;inset:0;z-index:2;pointer-events:none;opacity:1;mix-blend-mode:soft-light;background:url('assets/texture-cracks.webp') center/cover no-repeat;"></div>
 
   <!-- Bottom gradient -->
   <div class="bottom-gradient"></div>
@@ -1260,11 +1265,10 @@
   frame.appendChild(flashOverlay);
 
   // --- Sky flash overlay (localized radial gradients at random positions) ---
-  // No CSS filter — a 55px blur on a full-screen layer triggers huge compositor
-  // buffers on mobile GPUs and can crash the page. We approximate soft edges via
-  // a gradient with many gentle color stops.
+  // screen blend + heavy blur + low opacity = the gradient circle dissolves into a soft
+  // brightness bloom that feels like light spreading inside the clouds.
   const skyFlashOverlay = document.createElement('div');
-  skyFlashOverlay.style.cssText = 'position:absolute;inset:0;opacity:0;z-index:6;pointer-events:none;transition:opacity 0.06s;mix-blend-mode:screen;';
+  skyFlashOverlay.style.cssText = 'position:absolute;inset:-120px;opacity:0;z-index:6;pointer-events:none;transition:opacity 0.06s;mix-blend-mode:screen;filter:blur(55px);';
   frame.appendChild(skyFlashOverlay);
 
   // Random positions across the whole screen
@@ -1294,22 +1298,17 @@
 
   function randomSkyFlash() {
     const pos = skyFlashPositions[Math.floor(Math.random() * skyFlashPositions.length)];
+    // Bias toward small: most flashes stay around the base size, occasional huge ones
+    // pow(rand, 1.8) concentrates values near 0 → most multipliers are small, rare ones approach max
     const sizeMul = 1 + Math.pow(Math.random(), 1.8) * 2.2; // ≈ 1.0 … 3.2
     const radius = 350 * sizeMul;
-    const baseIntensity = 0.22 + Math.random() * 0.2;
-    const intensity = baseIntensity * (0.7 + 0.3 / sizeMul);
+    // Larger flashes read as brighter so we taper intensity a bit for the huge ones
+    const baseIntensity = 0.14 + Math.random() * 0.16;
+    const intensity = baseIntensity * (0.7 + 0.3 / sizeMul); // smaller = fuller brightness
     const myGen = ++flashGen;
 
-    // Many soft stops so the edge blends out gradually without needing a CSS blur filter
     skyFlashOverlay.style.background =
-      `radial-gradient(circle ${radius}px at ${pos.x} ${pos.y},
-        rgba(230,240,255,${intensity}) 0%,
-        rgba(220,235,255,${intensity * 0.82}) 10%,
-        rgba(205,225,255,${intensity * 0.6}) 22%,
-        rgba(190,215,255,${intensity * 0.4}) 36%,
-        rgba(175,205,255,${intensity * 0.22}) 52%,
-        rgba(160,195,255,${intensity * 0.1}) 70%,
-        rgba(150,190,255,0) 100%)`;
+      `radial-gradient(circle ${radius}px at ${pos.x} ${pos.y}, rgba(230,240,255,${intensity}) 0%, rgba(200,220,255,${intensity * 0.55}) 35%, rgba(170,200,255,${intensity * 0.2}) 60%, rgba(150,190,255,0) 85%)`;
 
     // Strobe: rapid flicker in the first ~130ms — matches how real lightning fires
     // multiple return strokes in quick succession before fading out.
@@ -1459,7 +1458,7 @@
   const particleCanvas = document.getElementById('particle-canvas');
   const pCtx = particleCanvas.getContext('2d');
   const particles = [];
-  const PARTICLE_COUNT = 30;
+  const PARTICLE_COUNT = 60;
 
   for (let i = 0; i < PARTICLE_COUNT; i++) {
     particles.push({
@@ -1553,10 +1552,7 @@
     return { segs, subs };
   }
 
-  const MAX_BOLTS = 8;
   function spawnBolt(isMega = false) {
-    // Safety cap — if something backs up, don't let the array explode
-    if (bolts.length >= MAX_BOLTS) return;
     const startAngle = Math.random() * Math.PI * 2;
     const arcExtent = isMega
       ? (Math.PI * (0.65 + Math.random() * 0.5)) * (Math.random() < 0.5 ? 1 : -1)   // ~120°–180°
@@ -1623,34 +1619,28 @@
   function strokeBoltThin(bolt, width, alpha, tailFrac, headFrac) {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    // No shadowBlur — use additive stacked strokes to fake the glow.
-    // Canvas shadowBlur is software-blurred per stroke and very expensive on mobile GPUs,
-    // while stacked strokes go through GPU compositing fast.
-    ctx.shadowBlur = 0;
 
-    // Pass 1: widest faint halo
-    ctx.strokeStyle = `rgba(60, 150, 255, ${alpha * 0.14})`;
+    // Pass 1: wide electric-blue halo
+    ctx.strokeStyle = `rgba(60, 150, 255, ${alpha * 0.5})`;
+    ctx.shadowColor = 'rgba(100, 180, 255, 0.95)';
+    ctx.shadowBlur = 14;
     walkBolt(bolt, (segs, d) => {
-      ctx.lineWidth = width * (d === 0 ? 12 : d === 1 ? 8 : 5);
+      ctx.lineWidth = width * (d === 0 ? 5 : d === 1 ? 3 : 2);
       drawPolylinePortion(segs, tailFrac, headFrac, centerX, centerY, true);
     });
 
-    // Pass 2: softer blue halo
-    ctx.strokeStyle = `rgba(90, 170, 255, ${alpha * 0.28})`;
+    // Pass 2: light electric mid
+    ctx.strokeStyle = `rgba(150, 210, 255, ${alpha * 0.85})`;
+    ctx.shadowColor = 'rgba(120, 190, 255, 0.9)';
+    ctx.shadowBlur = 7;
     walkBolt(bolt, (segs, d) => {
-      ctx.lineWidth = width * (d === 0 ? 7 : d === 1 ? 4.5 : 3);
+      ctx.lineWidth = width * (d === 0 ? 2 : d === 1 ? 1.2 : 0.9);
       drawPolylinePortion(segs, tailFrac, headFrac, centerX, centerY, true);
     });
 
-    // Pass 3: bright electric mid
-    ctx.strokeStyle = `rgba(150, 210, 255, ${alpha * 0.7})`;
-    walkBolt(bolt, (segs, d) => {
-      ctx.lineWidth = width * (d === 0 ? 2.5 : d === 1 ? 1.5 : 1);
-      drawPolylinePortion(segs, tailFrac, headFrac, centerX, centerY, true);
-    });
-
-    // Pass 4: hot white-blue core
+    // Pass 3: hot white-blue core
     ctx.strokeStyle = `rgba(240, 250, 255, ${alpha})`;
+    ctx.shadowBlur = 0;
     walkBolt(bolt, (segs, d) => {
       ctx.lineWidth = width * (d === 0 ? 0.9 : d === 1 ? 0.7 : 0.5);
       drawPolylinePortion(segs, tailFrac, headFrac, centerX, centerY, true);
@@ -1660,14 +1650,9 @@
   function strokeAfterglow(bolt, alpha) {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.shadowBlur = 0;
-    // Wider faint pass + narrower brighter pass, no shadowBlur
-    ctx.strokeStyle = `rgba(90, 170, 255, ${alpha * 0.35})`;
-    walkBolt(bolt, (segs, d) => {
-      ctx.lineWidth = (d === 0 ? 6 : 4);
-      drawPolylinePortion(segs, 0, 1, centerX, centerY, false);
-    });
-    ctx.strokeStyle = `rgba(150, 200, 255, ${alpha * 0.7})`;
+    ctx.strokeStyle = `rgba(80, 160, 255, ${alpha * 0.7})`;
+    ctx.shadowColor = 'rgba(100, 180, 255, 0.8)';
+    ctx.shadowBlur = 10;
     walkBolt(bolt, (segs, d) => {
       ctx.lineWidth = (d === 0 ? 2 : 1.4);
       drawPolylinePortion(segs, 0, 1, centerX, centerY, false);
