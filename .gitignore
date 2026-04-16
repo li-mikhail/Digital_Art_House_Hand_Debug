@@ -1,1 +1,8 @@
 .vercel
+.DS_Store
+
+# Experimental/demo files
+gradient-export.html
+layer-demo.html
+mesh-demo.html
+sky-export.html
