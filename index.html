@@ -1,0 +1,3606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Touch to Create</title>
+<!-- Cormorant Garamond + Inter — local copy of Google Fonts (no internet required) -->
+<link href="assets/fonts/google/fonts.css" rel="stylesheet">
+<style>
+  /* v4: TTF → woff2 (-70% bundle weight: 970 KB → 305 KB total) */
+  @font-face {
+    font-family: 'Avenir Next Cyr';
+    src: url('assets/AvenirNextCyr-Regular.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'Avenir Next Cyr';
+    src: url('assets/AvenirNextCyr-Medium.woff2') format('woff2');
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'Avenir Next Cyr';
+    src: url('assets/AvenirNextCyr-Bold.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'Didot';
+    src: url('assets/Didot.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'Didot';
+    src: url('assets/Didot-Bold.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'Didot';
+    src: url('assets/Didot-Italic.woff2') format('woff2');
+    font-weight: 400;
+    font-style: italic;
+    font-display: swap;
+  }
+</style>
+<script src="assets/vendor/rive.js"></script>
+<script>
+  // Use local Rive WASM so the project works fully offline.
+  if (window.rive && rive.RuntimeLoader && rive.RuntimeLoader.setWasmUrl) {
+    rive.RuntimeLoader.setWasmUrl('assets/vendor/rive.wasm');
+  }
+</script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #222;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  #frame {
+    width: 1080px;
+    height: 1920px;
+    transform-origin: center center;
+    position: relative;
+    overflow: hidden;
+    background: #b8cfe0;
+    box-shadow: 0 0 60px rgba(0,0,0,0.5);
+  }
+
+  /* ============ FULLSCREEN TOGGLE BUTTON ============ */
+  .fs-btn {
+    position: absolute;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255, 255, 255, 0.55);
+    background: rgba(0, 0, 0, 0.35);
+    color: rgba(255, 255, 255, 0.92);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+    opacity: 1;
+    transition: opacity 0.5s ease;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+  .fs-btn.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .fs-btn svg { display: block; }
+
+  /* ============ LOGO ============ */
+
+  /* Old top-left logo hidden */
+  .logo-top {
+    display: none;
+  }
+
+  /* Logo and address next to circle (appear on active) */
+  .circle-logo,
+  .circle-address {
+    position: absolute;
+    top: 42%;
+    left: 50%;
+    z-index: 10;
+    pointer-events: none;
+    opacity: 0;
+    transform: translate(-50%, -50%);
+    transition: transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.6s ease-in-out;
+  }
+
+  .circle-logo img {
+    width: 180px;
+    height: auto;
+    display: block;
+  }
+
+  .circle-address {
+    font-family: 'Avenir Next Cyr', 'Inter', sans-serif;
+    font-size: 28px;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.9);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    white-space: nowrap;
+    text-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+  }
+
+  /* `.holding-active` mirrors the active-state position+opacity for these
+     elements after frame.active has been removed, so the logo+address linger
+     on screen for the post-release hold + fade. */
+  #frame.active .circle-logo,
+  .circle-logo.holding-active {
+    opacity: 1;
+    transform: translate(calc(-50% - 320px), -50%);
+  }
+
+  #frame.active .circle-address,
+  .circle-address.holding-active {
+    opacity: 1;
+    transform: translate(calc(-50% + 320px), -50%);
+  }
+
+  /* ============ SKY LAYERS ============ */
+
+  .sky-gradient {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg,
+      #7baed4 0%, #a0c8e0 15%, #c4dced 35%,
+      #e2d6c8 55%, #e8c9a8 75%, #d4a878 100%
+    );
+    transition: opacity 2s ease-in-out;
+    z-index: 0;
+  }
+
+  .sky-gradient-storm {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg,
+      #1a2030 0%, #2a3348 15%, #3a4058 35%,
+      #4a465a 55%, #5a4a48 75%, #3a2a20 100%
+    );
+    opacity: 0;
+    transition: opacity 2s ease-in-out;
+    z-index: 0;
+  }
+
+  .cloud-base {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    display: flex;
+    z-index: 1;
+    opacity: 0.85;
+    animation: drift-base 80s linear infinite;
+    transition: filter 2s ease-in-out;
+  }
+
+  .cloud-base img {
+    height: 100%;
+    width: auto;
+    display: block;
+    flex-shrink: 0;
+    margin-right: -700px;
+  }
+
+  @keyframes drift-base {
+    0% { transform: translateX(-50%); }
+    100% { transform: translateX(0); }
+  }
+
+  .cloud {
+    position: absolute;
+    z-index: 2;
+    pointer-events: none;
+    transition: filter 2s ease-in-out;
+  }
+
+  .cloud img {
+    display: block;
+    max-width: none;
+    height: auto;
+  }
+
+  .cloud-1 { top: 3%; left: 0; opacity: 0.6; }
+  .cloud-1 img { width: 1200px; animation: drift-cloud-1 30s linear infinite; animation-delay: -5s; }
+
+  .cloud-2 { top: 32%; left: 0; opacity: 0.5; }
+  .cloud-2 img { width: 1400px; animation: drift-cloud-2 70s linear infinite; animation-delay: -45s; }
+
+  .cloud-3 { top: 58%; left: 0; opacity: 0.55; }
+  .cloud-3 img { width: 1300px; animation: drift-cloud-3 50s linear infinite; animation-delay: -25s; }
+
+  @keyframes drift-cloud-1 { 0% { transform: translateX(-1300px); } 100% { transform: translateX(1200px); } }
+  @keyframes drift-cloud-2 { 0% { transform: translateX(-1500px); } 100% { transform: translateX(1200px); } }
+  @keyframes drift-cloud-3 { 0% { transform: translateX(-1400px); } 100% { transform: translateX(1200px); } }
+
+  #frame.active .sky-gradient { opacity: 0; }
+  #frame.active .sky-gradient-storm { opacity: 1; }
+  #frame.active .cloud-base,
+  #frame.active .cloud { filter: brightness(0.35) contrast(1.5) saturate(0.5); }
+
+  /* Storm clouds — slide in from sides on active */
+  .storm-cloud {
+    position: absolute;
+    z-index: 2;
+    pointer-events: none;
+    opacity: 0;
+    /* Stronger ease-out: sharp takeoff, long gentle deceleration */
+    transition: transform 3s cubic-bezier(0.16, 1, 0.3, 1), opacity 2s ease-in-out;
+    /* v3: filter chain removed — brightness/contrast/saturate/hue-rotate +
+       drop-shadow are all pre-baked into the *-storm.webp source files. */
+  }
+
+
+  .storm-cloud img {
+    display: block;
+    max-width: none;
+    height: auto;
+  }
+
+  /* Left side storm clouds — start off left edge */
+  .storm-cloud-left-1 {
+    top: -8%;
+    left: 0;
+    transform: translateX(-2000px);
+    transition-duration: 2.8s, 2s, 2s; /* fastest */
+  }
+  .storm-cloud-left-1 img {
+    width: 2300px;
+    animation: storm-drift-right-1 22s ease-in-out infinite alternate;
+  }
+
+  .storm-cloud-left-2 {
+    top: 38%;
+    left: 0;
+    transform: translateX(-2200px);
+    transition-duration: 3.8s, 2s, 2s; /* slowest */
+  }
+  .storm-cloud-left-2 img {
+    width: 2500px;
+    animation: storm-drift-right-2 35s ease-in-out infinite alternate;
+  }
+
+  /* Right side storm clouds — start off right edge */
+  .storm-cloud-right-1 {
+    top: 12%;
+    right: 0;
+    transform: translateX(2000px);
+    transition-duration: 3.2s, 2s, 2s;
+  }
+  .storm-cloud-right-1 img {
+    width: 2400px;
+    animation: storm-drift-left-1 27s ease-in-out infinite alternate;
+  }
+
+  .storm-cloud-right-2 {
+    top: 62%;
+    right: 0;
+    transform: translateX(2100px);
+    transition-duration: 3.5s, 2s, 2s;
+  }
+  .storm-cloud-right-2 img {
+    width: 2200px;
+    animation: storm-drift-left-2 40s ease-in-out infinite alternate;
+  }
+
+  @keyframes storm-drift-right-1 {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(220px); }
+  }
+  @keyframes storm-drift-right-2 {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(300px); }
+  }
+  @keyframes storm-drift-left-1 {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-260px); }
+  }
+  @keyframes storm-drift-left-2 {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-340px); }
+  }
+
+  /* On active — slide toward center and fade in */
+  #frame.active .storm-cloud {
+    opacity: 0.95;
+  }
+  #frame.active .storm-cloud-left-1 { transform: translateX(-200px); }
+  #frame.active .storm-cloud-left-2 { transform: translateX(-150px); }
+  #frame.active .storm-cloud-right-1 { transform: translateX(200px); }
+  #frame.active .storm-cloud-right-2 { transform: translateX(180px); }
+
+  /* ============ HAND ============ */
+
+  #hand-canvas {
+    position: absolute;
+    top: -345px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 900px;
+    height: 1500px;
+    z-index: 11;
+    pointer-events: none;
+    transition: filter 2s ease-in-out;
+  }
+
+  #frame.active #hand-canvas {
+    animation: tremble 0.12s ease-in-out infinite alternate;
+  }
+
+  @keyframes tremble {
+    from { transform: translateX(-50%) translate(0, 0); }
+    to { transform: translateX(-50%) translate(1px, 1.5px); }
+  }
+
+  /* ============ CIRCLE ============ */
+
+  .circle-area {
+    position: absolute;
+    top: 42%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 30px;
+  }
+
+  .circle-btn {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    border: 2.5px solid rgba(255, 255, 255, 0.7);
+    background: transparent;
+    cursor: pointer;
+    position: relative;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: border-color 0.4s ease, box-shadow 0.4s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .circle-btn.active {
+    border-color: transparent;
+    box-shadow: none;
+  }
+
+  /* Tap hand icon inside button */
+  .tap-icon {
+    width: 96px;
+    height: 96px;
+    opacity: 0.7;
+    animation: tap-motion 2s ease-in-out infinite;
+  }
+
+  .circle-btn.active .tap-icon {
+    display: none;
+  }
+
+  @keyframes tap-motion {
+    0% { transform: translate(85px, 85px) scale(1); opacity: 0; }
+    30% { transform: translate(35px, 35px) scale(0.97); opacity: 0.7; }
+    45% { transform: translate(28px, 28px) scale(0.9); opacity: 1; }
+    55% { transform: translate(28px, 28px) scale(0.9); opacity: 1; }
+    70% { transform: translate(35px, 35px) scale(0.97); opacity: 0.7; }
+    100% { transform: translate(85px, 85px) scale(1); opacity: 0; }
+  }
+
+  /* Tap rays — appear at moment of "press" */
+  .tap-rays {
+    position: absolute;
+    width: 60px;
+    height: 60px;
+    pointer-events: none;
+    animation: rays-burst 2s ease-in-out infinite;
+  }
+
+  .tap-rays line {
+    stroke: rgba(255, 255, 255, 0.6);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+  }
+
+  @keyframes rays-burst {
+    0% { opacity: 0; transform: scale(0.5); }
+    40% { opacity: 0; transform: scale(0.5); }
+    50% { opacity: 0.8; transform: scale(1); }
+    65% { opacity: 0; transform: scale(1.3); }
+    100% { opacity: 0; transform: scale(1.3); }
+  }
+
+  .circle-btn.active .tap-rays {
+    display: none;
+  }
+
+  /* Pulse rings */
+  .circle-btn::before,
+  .circle-btn::after {
+    content: '';
+    position: absolute;
+    inset: -8px;
+    border: 1.5px solid rgba(255, 255, 255, 0.4);
+    border-radius: 50%;
+    animation: pulse 2.5s ease-out infinite;
+  }
+  .circle-btn::after { animation-delay: 1.25s; }
+
+  @keyframes pulse {
+    0% { transform: scale(1); opacity: 1; }
+    100% { transform: scale(2); opacity: 0; }
+  }
+
+  .circle-btn.active::before,
+  .circle-btn.active::after {
+    animation: none;
+    opacity: 0;
+  }
+
+  /* Touch text */
+  .touch-text {
+    position: absolute;
+    top: 48%;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    font-family: 'Cormorant Garamond', 'Georgia', serif;
+    font-size: 38px;
+    white-space: nowrap;
+    transition: opacity 0.5s ease-in-out;
+    font-weight: 300;
+    color: rgba(255, 255, 255, 0.85);
+    letter-spacing: 5px;
+    user-select: none;
+    -webkit-user-select: none;
+    text-shadow: 0 1px 10px rgba(0,0,0,0.4);
+    text-transform: uppercase;
+  }
+
+  /* ============ LANGUAGE SWITCHER ============ */
+
+  .lang-btn {
+    position: absolute;
+    /* Centered vertically between "Touch to create" and "Michelangelo" */
+    top: 52%;
+    left: 50%;
+    /* Pair with info-btn: 20px gap between buttons (42px wide each) → centers 62px apart → ±31px */
+    transform: translateX(calc(-50% - 31px));
+    z-index: 10;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255, 255, 255, 0.4);
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.6);
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+  }
+
+  .lang-btn:hover {
+    border-color: rgba(255, 255, 255, 0.7);
+    color: rgba(255, 255, 255, 0.9);
+    background: rgba(255, 255, 255, 0.15);
+  }
+
+  /* ============ BOTTOM SECTION ============ */
+
+  .bottom-gradient {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 900px;
+    background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 100%);
+    z-index: 4;
+    pointer-events: none;
+  }
+
+  .bottom-section {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    padding: 0 65px 50px;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .title-main {
+    font-family: 'Didot', 'Georgia', serif;
+    font-size: 143px;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1.0;
+    margin-bottom: 5px;
+    letter-spacing: -2.9px;
+    text-align: center;
+    height: 150px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: filter 0.3s, text-shadow 0.3s;
+  }
+
+  .title-sub {
+    font-family: 'Didot', 'Georgia', serif;
+    font-size: 86px;
+    font-weight: 400;
+    font-style: normal;
+    color: rgba(255, 255, 255, 0.85);
+    line-height: 1.2;
+    margin-bottom: 220px;
+    text-align: center;
+    letter-spacing: 2px;
+    height: 110px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: filter 0.3s, text-shadow 0.3s;
+  }
+
+  .title-main.scrambling,
+  .title-sub.scrambling {
+    /* v5 typewriter: no per-frame visual treatment needed during transition
+       (text just types/erases char-by-char via textContent — cheap). */
+  }
+
+  .title-main,
+  .title-sub {
+    transition: filter 0.5s ease-in-out, text-shadow 0.5s ease-in-out;
+  }
+
+  /* Active-state intro (two lines, shown only when pressed) */
+  .active-intro {
+    display: none;
+    text-align: center;
+    margin-bottom: 40px;
+  }
+  #frame.active .active-intro,
+  #frame.holding-text .active-intro {
+    display: block;
+    /* Visually nudge intro down 30px without affecting layout of elements below */
+    transform: translateY(30px);
+  }
+
+  .intro-line {
+    font-family: 'Avenir Next Cyr', 'Inter', sans-serif;
+    font-weight: 500;
+    font-size: 82px;
+    color: #fff;
+    text-transform: uppercase;
+    line-height: 1.0;
+    letter-spacing: 1px;
+    transition: filter 0.5s ease-in-out, text-shadow 0.5s ease-in-out;
+  }
+  .intro-line + .intro-line { margin-top: 4px; }
+
+  /* Second line of the big active title (EXHIBITION / IZSTĀDE) */
+  .title-main-line2 {
+    display: none;
+    font-family: 'Avenir Next Cyr', 'Inter', sans-serif;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1.0;
+    text-align: center;
+    letter-spacing: -1px;
+    height: 150px;
+    align-items: center;
+    justify-content: center;
+    transition: filter 0.5s ease-in-out, text-shadow 0.5s ease-in-out;
+  }
+  #frame.active .title-main-line2,
+  #frame.holding-text .title-main-line2 {
+    display: flex;
+    font-size: 150px;
+  }
+
+  /* Active-state overrides for title-main (first huge line: IMMERSIVE / IMERSĪVA) */
+  #frame.active .title-main,
+  #frame.holding-text .title-main {
+    font-family: 'Avenir Next Cyr', 'Inter', sans-serif;
+    font-weight: 700;
+    font-size: 150px;
+    letter-spacing: -1px;
+    text-transform: uppercase;
+  }
+
+  /* Russian words are wider than English/Latvian — shrink the big lines so they
+     don't bleed off the sides. Triggered when the body has the lang-ru class.
+     Also tighten the gap between ВЫСТАВКА and ПОГРУЖЕНИЯ — ПОГРУЖЕНИЯ stays
+     anchored to the bottom, ВЫСТАВКА (and the intro above it) shift downward. */
+  body.lang-ru #frame.active .title-main,
+  body.lang-ru #frame.active .title-main-line2,
+  body.lang-ru #frame.holding-text .title-main,
+  body.lang-ru #frame.holding-text .title-main-line2 {
+    font-size: 130px;
+  }
+  body.lang-ru #frame.active .title-main,
+  body.lang-ru #frame.holding-text .title-main {
+    height: 130px;          /* match font-size — no inner padding */
+    margin-bottom: -25px;   /* pull title-main-line2 closer */
+  }
+
+  /* Active-state overrides for title-sub (Michelangelo — El tocco dell'Eterno) */
+  #frame.active .title-sub,
+  #frame.holding-text .title-sub {
+    font-family: 'Didot', 'Georgia', serif;
+    font-weight: 400;
+    font-size: 50px;
+    letter-spacing: 1px;
+    margin-bottom: 80px;
+    text-transform: none;
+  }
+
+  .intro-line.scrambling,
+  .title-main-line2.scrambling {
+    /* v5 typewriter: no per-frame visual treatment needed during transition
+       (text just types/erases char-by-char via textContent — cheap). */
+  }
+
+  /* Glitch effect */
+  @keyframes glitch-1 {
+    0% { clip-path: inset(20% 0 60% 0); transform: translate(-3px, 2px); }
+    20% { clip-path: inset(60% 0 10% 0); transform: translate(3px, -1px); }
+    40% { clip-path: inset(40% 0 30% 0); transform: translate(-2px, 1px); }
+    60% { clip-path: inset(10% 0 70% 0); transform: translate(4px, -2px); }
+    80% { clip-path: inset(70% 0 5% 0); transform: translate(-1px, 3px); }
+    100% { clip-path: inset(30% 0 40% 0); transform: translate(2px, -1px); }
+  }
+
+  @keyframes glitch-2 {
+    0% { clip-path: inset(50% 0 20% 0); transform: translate(3px, -2px); opacity: 0.8; }
+    25% { clip-path: inset(10% 0 60% 0); transform: translate(-4px, 1px); opacity: 0.6; }
+    50% { clip-path: inset(70% 0 5% 0); transform: translate(2px, 3px); opacity: 0.9; }
+    75% { clip-path: inset(25% 0 45% 0); transform: translate(-3px, -1px); opacity: 0.7; }
+    100% { clip-path: inset(55% 0 15% 0); transform: translate(1px, 2px); opacity: 0.8; }
+  }
+
+  .title-glitch {
+    position: relative;
+  }
+
+  .title-glitch.glitching::before,
+  .title-glitch.glitching::after {
+    content: attr(data-text);
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    text-align: inherit;
+    letter-spacing: inherit;
+    font: inherit;
+    color: inherit;
+  }
+
+  .title-glitch.glitching::before {
+    color: rgba(255, 100, 100, 0.8);
+    animation: glitch-1 0.15s linear infinite;
+  }
+
+  .title-glitch.glitching::after {
+    color: rgba(100, 200, 255, 0.8);
+    animation: glitch-2 0.12s linear infinite;
+  }
+
+  /* (.scramble-char removed in v5 — typewriter doesn't wrap chars in spans) */
+
+  .qr-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 80px; /* lifts QR + TICKETS 80px from frame bottom */
+  }
+
+  .qr-label {
+    font-family: 'Avenir Next Cyr', 'Inter', sans-serif;
+    font-size: 26px;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.55);
+    text-transform: uppercase;
+    letter-spacing: 14px;
+    text-indent: 14px;
+    /* v5: reserve a fixed line box so the typewriter erasing this label to ''
+       (during language switch) doesn't collapse .qr-area's height and shove
+       titleSub / titleMain downward. */
+    display: inline-block;
+    min-height: 32px;     /* 26 px font × 1.2 line-height */
+    line-height: 1.2;
+  }
+
+  .qr-code {
+    width: 180px;
+    height: 180px;
+  }
+
+  /* ============ INFO BUTTON ============ */
+
+  .info-btn {
+    position: absolute;
+    top: 52%; /* same line as lang-btn */
+    left: 50%;
+    transform: translateX(calc(-50% + 31px));
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255, 255, 255, 0.4);
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.6);
+    font-family: 'Didot', 'Georgia', serif;
+    font-size: 22px;
+    font-style: italic;
+    font-weight: 700;
+    cursor: pointer;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+    z-index: 12;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+  }
+
+  .info-btn:hover {
+    border-color: rgba(255, 255, 255, 0.8);
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+  }
+
+  /* ============ INFO PANEL ============ */
+
+  .info-panel {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    flex-direction: column;
+    padding: 140px 80px 80px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.6s ease-in-out;
+    overflow: hidden;
+  }
+
+  .info-bg-video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: -1;
+    /* v3: filter & scale removed — blur and brightness are pre-baked into the
+       source MP4. The runtime cost of CSS blur(15px) on a moving 1080×1920
+       video was 5–15 ms per frame on weak GPUs. */
+  }
+
+  /* QR area inside info panel — same look as on the home page */
+  .info-qr-area {
+    /* Home page QR sits 50+80=130px from frame bottom. Info panel has padding-bottom:80px,
+       so we add margin-bottom:50px to match home page height exactly. */
+    margin-bottom: 50px;
+    margin-top: auto; /* pushed to bottom of the flex column */
+    align-self: center;
+  }
+
+  .info-panel.visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .info-panel-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 30px;
+    /* Lift the entire text block up by 150px */
+    transform: translateY(-150px);
+  }
+
+  .info-title {
+    font-family: 'Didot', 'Georgia', serif;
+    font-size: 72px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 3px;
+    margin-bottom: 10px;
+  }
+
+  .info-text {
+    font-family: 'Avenir Next Cyr', 'Inter', sans-serif;
+    font-size: 30px;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.8);
+    line-height: 1.6;
+  }
+
+  .info-text strong {
+    color: #fff;
+    font-weight: 500;
+  }
+
+  .info-text .highlight {
+    font-size: 34px;
+    color: #fff;
+    font-weight: 400;
+    letter-spacing: 1px;
+  }
+
+  .info-details {
+    font-family: 'Avenir Next Cyr', 'Inter', sans-serif;
+    font-size: 26px;
+    color: rgba(255, 255, 255, 0.6);
+    line-height: 1.8;
+  }
+
+  .info-hashtags {
+    font-family: 'Avenir Next Cyr', 'Inter', sans-serif;
+    font-size: 20px;
+    color: rgba(255, 255, 255, 0.35);
+    line-height: 1.6;
+    margin-top: 10px;
+  }
+
+  .info-close {
+    /* Sits inside .info-panel-content as the last flex item, 50px below text */
+    align-self: center;
+    margin-top: 50px;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255, 255, 255, 0.5);
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 24px;
+    cursor: pointer;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+  }
+
+  .info-close:hover {
+    border-color: rgba(255, 255, 255, 0.8);
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+  }
+
+  /* Hand hides when info is open */
+  #hand-canvas {
+    transition: transform 1s ease-in-out;
+  }
+
+  #frame.info-open #hand-canvas {
+    transform: translateX(-50%) translateY(-400px);
+  }
+
+  #frame.info-open .circle-area,
+  #frame.info-open .touch-text,
+  #frame.info-open .lang-btn,
+  #frame.info-open .bottom-section,
+  #frame.info-open .bottom-gradient {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s ease-in-out;
+  }
+
+  /* ============ DISCOUNT REWARD ============ */
+
+  .discount-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 15;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 30px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.6s ease-in-out;
+  }
+
+  .discount-overlay.visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .discount-title {
+    font-family: 'Didot', 'Georgia', serif;
+    font-size: 80px;
+    font-weight: 700;
+    color: #fff;
+    text-align: center;
+    letter-spacing: 3px;
+  }
+
+  .discount-value {
+    font-family: 'Didot', 'Georgia', serif;
+    font-size: 140px;
+    font-weight: 700;
+    color: rgba(200, 220, 255, 1);
+    text-shadow: 0 0 30px rgba(150, 180, 255, 0.5), 0 0 60px rgba(130, 160, 255, 0.3);
+    letter-spacing: 5px;
+  }
+
+  .discount-subtitle {
+    font-family: 'Avenir Next Cyr', 'Inter', sans-serif;
+    font-size: 28px;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.7);
+    text-align: center;
+    letter-spacing: 2px;
+    max-width: 700px;
+    line-height: 1.5;
+  }
+
+  .discount-qr {
+    width: 250px;
+    height: 250px;
+    border-radius: 12px;
+    margin-top: 10px;
+  }
+
+  .discount-scan {
+    font-family: 'Avenir Next Cyr', 'Inter', sans-serif;
+    font-size: 22px;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.5);
+    letter-spacing: 4px;
+    text-transform: uppercase;
+  }
+
+  .discount-close-hint {
+    font-family: 'Avenir Next Cyr', 'Inter', sans-serif;
+    font-size: 16px;
+    color: rgba(255, 255, 255, 0.3);
+    margin-top: 20px;
+  }
+
+  /* Hide touch text, lang button, and info button when active.
+     The .holding-text mirror keeps them hidden during the post-release
+     5-second hold + 2-second fade (so they don't pop in over the active
+     text + logo + address that are still on screen). */
+  #frame.active .touch-text,
+  #frame.active .lang-btn,
+  #frame.active .info-btn,
+  #frame.holding-text .touch-text,
+  #frame.holding-text .lang-btn,
+  #frame.holding-text .info-btn {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .info-btn {
+    transition: opacity 0.5s ease-in-out;
+  }
+
+  /* ============ PARTICLES ============ */
+
+  #particle-canvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 1080px; height: 1920px;
+    z-index: 3;
+    pointer-events: none;
+  }
+
+  /* ============ BEAM ============ */
+
+  #beam-canvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 1080px; height: 1920px;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  /* ============ DEBUG PANEL ============ */
+
+  .debug-toggle {
+    position: fixed;
+    top: 18px;
+    right: 18px;
+    z-index: 1000;
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    background: rgba(12, 16, 24, 0.48);
+    color: rgba(255, 255, 255, 0.9);
+    font: 24px/1 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  .debug-toggle:active {
+    transform: scale(0.96);
+  }
+
+  .debug-panel {
+    position: fixed;
+    top: 84px;
+    right: 18px;
+    z-index: 1000;
+    width: min(360px, calc(100vw - 36px));
+    max-height: calc(100vh - 110px);
+    overflow-y: auto;
+    padding: 16px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(12, 16, 24, 0.86);
+    color: rgba(255, 255, 255, 0.9);
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.36);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    touch-action: manipulation;
+  }
+
+  .debug-panel[hidden] {
+    display: none;
+  }
+
+  .debug-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+  }
+
+  .debug-section {
+    padding: 12px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+  }
+
+  .debug-section:first-of-type {
+    border-top: 0;
+    padding-top: 0;
+  }
+
+  .debug-section-title {
+    margin-bottom: 10px;
+    color: rgba(255, 255, 255, 0.62);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.9px;
+    text-transform: uppercase;
+  }
+
+  .debug-control {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px 10px;
+    align-items: center;
+    margin: 10px 0;
+    font-size: 13px;
+  }
+
+  .debug-control input[type="range"] {
+    grid-column: 1 / -1;
+    width: 100%;
+    accent-color: #8ec5ff;
+  }
+
+  .debug-control select {
+    min-width: 96px;
+    padding: 7px 9px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    font: inherit;
+  }
+
+  .debug-control input[type="checkbox"] {
+    width: 22px;
+    height: 22px;
+    accent-color: #8ec5ff;
+  }
+
+  .debug-value {
+    min-width: 44px;
+    color: rgba(255, 255, 255, 0.72);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+
+  .debug-metrics {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .debug-metric {
+    padding: 8px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.07);
+    font-size: 12px;
+  }
+
+  .debug-metric span {
+    display: block;
+    margin-top: 3px;
+    color: #fff;
+    font-size: 16px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .debug-reset {
+    width: 100%;
+    min-height: 42px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    font: inherit;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+</style>
+</head>
+<body>
+
+<div id="frame">
+  <!-- Logo (hidden in idle, shown via .circle-logo below) -->
+  <img class="logo-top" src="assets/logo.png" alt="Digital Art House">
+
+  <!-- Logo and address next to circle (appear on active) -->
+  <div class="circle-logo"><img src="assets/logo.png" alt="Digital Art House"></div>
+  <div class="circle-address">Rīga, Skolas iela 2</div>
+
+  <!-- Sky -->
+  <div class="sky-gradient"></div>
+  <div class="sky-gradient-storm"></div>
+
+  <!-- Main cloud background -->
+  <div class="cloud-base">
+    <img src="assets/clouds_0.webp" alt="">
+    <img src="assets/clouds_0.webp" alt="">
+  </div>
+
+  <!-- Individual cloud overlays -->
+  <div class="cloud cloud-1"><img src="assets/Cloud-05.webp" alt=""></div>
+  <div class="cloud cloud-2"><img src="assets/Cloud-17.webp" alt=""></div>
+  <div class="cloud cloud-3"><img src="assets/Cloud-25.webp" alt=""></div>
+
+  <!-- Storm clouds — slide in from sides on active.
+       v3: switched to pre-baked *-storm.webp variants which already include
+       brightness/contrast/saturate/hue-rotate AND drop-shadow burned in.
+       The CSS `filter:` chain was removed from .storm-cloud (was 5 effects
+       per element × 4 elements × every animation frame). -->
+  <div class="storm-cloud storm-cloud-left-1"><img src="assets/Cloud-17-storm.webp" alt=""></div>
+  <div class="storm-cloud storm-cloud-left-2"><img src="assets/Cloud-25-storm.webp" alt=""></div>
+  <div class="storm-cloud storm-cloud-right-1"><img src="assets/Cloud-05-storm.webp" alt=""></div>
+  <div class="storm-cloud storm-cloud-right-2"><img src="assets/Cloud-17-storm.webp" alt=""></div>
+
+  <!-- Cracks texture overlay -->
+  <!-- Hand -->
+  <canvas id="hand-canvas" width="900" height="1500"></canvas>
+
+  <!-- Cracks texture overlay — REMOVED in v3 for performance.
+       mix-blend-mode: soft-light on a fullscreen overlay re-composited every
+       frame on top of the moving clouds was one of the heaviest GPU costs.
+       Will be re-added later as a static pre-baked image (no blend mode). -->
+
+  <!-- Bottom gradient -->
+  <div class="bottom-gradient"></div>
+
+  <!-- Circle + Touch to Create + Language switcher -->
+  <div class="circle-area">
+    <button class="circle-btn" id="circleBtn">
+      <!-- Tap hand icon -->
+      <img class="tap-icon" src="assets/touch-finger.png" alt="">
+      <!-- Tap rays -->
+      <svg class="tap-rays" viewBox="0 0 60 60">
+        <line x1="30" y1="5" x2="30" y2="15"/>
+        <line x1="50" y1="12" x2="43" y2="20"/>
+        <line x1="55" y1="30" x2="45" y2="30"/>
+        <line x1="10" y1="12" x2="17" y2="20"/>
+        <line x1="5" y1="30" x2="15" y2="30"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Progress bar -->
+<!-- Touch text + language (independent from circle) -->
+  <span class="touch-text" id="touchText">Touch to Create</span>
+  <button class="lang-btn" id="langBtn">LV</button>
+
+  <!-- Bottom section -->
+  <div class="bottom-section">
+    <!-- Active-only intro: two lines, shown when pressed -->
+    <div class="active-intro">
+      <div class="intro-line title-glitch" id="introLine1" data-text=""></div>
+      <div class="intro-line title-glitch" id="introLine2" data-text=""></div>
+    </div>
+    <div class="title-main title-glitch" id="titleMain" data-text="Michelangelo">Michelangelo</div>
+    <div class="title-main-line2 title-glitch" id="titleMainLine2" data-text=""></div>
+    <div class="title-sub title-glitch" id="titleSub" data-text="— El tocco dell'Eterno">— El tocco dell'Eterno</div>
+    <div class="qr-area">
+      <span class="qr-label" id="ticketsLabel">Tickets</span>
+      <img class="qr-code" src="assets/qr-code.png" alt="QR">
+    </div>
+  </div>
+
+  <!-- Discount reward overlay -->
+  <div class="discount-overlay" id="discountOverlay">
+    <div class="discount-title" id="discountTitle">Congratulations!</div>
+    <div class="discount-value">-20%</div>
+    <div class="discount-subtitle" id="discountSubtitle">You've unlocked a special discount on your ticket</div>
+    <img class="discount-qr" src="assets/qr-code.png" alt="QR">
+    <div class="discount-scan" id="discountScan">Scan to buy</div>
+    <div class="discount-close-hint" id="discountHint">Tap anywhere to close</div>
+  </div>
+
+  <!-- Info button -->
+  <button class="info-btn" id="infoBtn">i</button>
+
+  <!-- Info panel -->
+  <div class="info-panel" id="infoPanel">
+    <video class="info-bg-video" id="infoBgVideo" loop muted playsinline>
+      <source src="assets/info-bg-video.mp4" type="video/mp4">
+    </video>
+    <button class="info-close" id="infoClose">✕</button>
+    <div class="info-panel-content" id="infoPanelContent">
+      <!-- Content injected by JS based on language -->
+    </div>
+    <div class="qr-area info-qr-area">
+      <span class="qr-label" id="infoTicketsLabel">Tickets</span>
+      <img class="qr-code" src="assets/qr-code.png" alt="QR">
+    </div>
+  </div>
+
+  <!-- Particles -->
+  <canvas id="particle-canvas" width="1080" height="1920"></canvas>
+
+  <!-- Energy beam -->
+  <!-- Internal pixel buffer is 540×960 (½ of CSS 1080×1920). The drawing code
+       keeps its 1080×1920 coordinate space via ctx.scale(1/2) below. This is
+       intentionally softer but much cheaper on weak PCs. -->
+  <canvas id="beam-canvas" width="540" height="960"></canvas>
+
+  <!-- Fullscreen toggle (auto-hides 15s after page load / fullscreen change) -->
+  <button id="fsBtn" class="fs-btn" type="button" aria-label="Enter fullscreen">
+    <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true">
+      <path class="fs-icon-enter" fill="currentColor"
+        d="M4 4h6v2H6v4H4V4zm10 0h6v6h-2V6h-4V4zM4 14h2v4h4v2H4v-6zm14 0h2v6h-6v-2h4v-4z"/>
+      <path class="fs-icon-exit" fill="currentColor" style="display:none"
+        d="M8 8H4V6h6v6H8V8zm8 0V6h-6v6h6V8zm-2 2v-2h-2v4h6v-2h-4zm-6 4v-2H2v6h6v-2H4v-2h4zm10 0h-4v6h2v-4h4v-2h-2z"/>
+    </svg>
+  </button>
+</div>
+
+<button class="debug-toggle" id="debugToggle" type="button" aria-label="Open debug settings">⚙</button>
+<div class="debug-panel" id="debugPanel" hidden>
+  <div class="debug-title">
+    <span>Debug Performance</span>
+  </div>
+
+  <div class="debug-section">
+    <div class="debug-section-title">Live Metrics</div>
+    <div class="debug-metrics">
+      <div class="debug-metric">FPS <span id="debugFps">--</span></div>
+      <div class="debug-metric">Frame ms <span id="debugFrameMs">--</span></div>
+      <div class="debug-metric">Canvas <span id="debugCanvasInfo">100%</span></div>
+      <div class="debug-metric">Active FX <span id="debugActiveFx">0</span></div>
+    </div>
+  </div>
+
+  <div class="debug-section">
+    <div class="debug-section-title">Canvas</div>
+    <label class="debug-control">
+      <span>Canvas quality</span>
+      <select data-debug-setting="canvasQuality">
+        <option value="100">100%</option>
+        <option value="75">75%</option>
+        <option value="50">50%</option>
+        <option value="33">33%</option>
+        <option value="25">25%</option>
+      </select>
+    </label>
+    <label class="debug-control">
+      <span>Lightning FPS</span>
+      <span class="debug-value" data-debug-value="plasmaFps"></span>
+      <input type="range" min="10" max="60" step="1" data-debug-setting="plasmaFps">
+    </label>
+  </div>
+
+  <div class="debug-section">
+    <div class="debug-section-title">Lightning Amount</div>
+    <label class="debug-control">
+      <span>Flashes / discharges</span>
+      <span class="debug-value" data-debug-value="dischargeRate"></span>
+      <input type="range" min="0" max="20" step="1" data-debug-setting="dischargeRate">
+    </label>
+    <label class="debug-control">
+      <span>Bolt segments</span>
+      <span class="debug-value" data-debug-value="boltSegments"></span>
+      <input type="range" min="0" max="20" step="1" data-debug-setting="boltSegments">
+    </label>
+    <label class="debug-control">
+      <span>Max ring fragments</span>
+      <span class="debug-value" data-debug-value="maxRingFragments"></span>
+      <input type="range" min="0" max="12" step="1" data-debug-setting="maxRingFragments">
+    </label>
+  </div>
+
+  <div class="debug-section">
+    <div class="debug-section-title">Shadow Blur</div>
+    <label class="debug-control">
+      <span>Main glow blur</span>
+      <span class="debug-value" data-debug-value="mainGlowBlur"></span>
+      <input type="range" min="0" max="25" step="1" data-debug-setting="mainGlowBlur">
+    </label>
+    <label class="debug-control">
+      <span>Mid glow blur</span>
+      <span class="debug-value" data-debug-value="midGlowBlur"></span>
+      <input type="range" min="0" max="25" step="1" data-debug-setting="midGlowBlur">
+    </label>
+    <label class="debug-control">
+      <span>Radial main blur</span>
+      <span class="debug-value" data-debug-value="radialMainBlur"></span>
+      <input type="range" min="0" max="25" step="1" data-debug-setting="radialMainBlur">
+    </label>
+    <label class="debug-control">
+      <span>Radial branch blur</span>
+      <span class="debug-value" data-debug-value="radialBranchBlur"></span>
+      <input type="range" min="0" max="25" step="1" data-debug-setting="radialBranchBlur">
+    </label>
+    <label class="debug-control">
+      <span>Side branch blur</span>
+      <span class="debug-value" data-debug-value="sideBranchBlur"></span>
+      <input type="range" min="0" max="25" step="1" data-debug-setting="sideBranchBlur">
+    </label>
+    <label class="debug-control">
+      <span>Arc fragment blur</span>
+      <span class="debug-value" data-debug-value="arcFragmentBlur"></span>
+      <input type="range" min="0" max="25" step="1" data-debug-setting="arcFragmentBlur">
+    </label>
+    <label class="debug-control">
+      <span>Ring runner blur</span>
+      <span class="debug-value" data-debug-value="ringRunnerBlur"></span>
+      <input type="range" min="0" max="25" step="1" data-debug-setting="ringRunnerBlur">
+    </label>
+    <label class="debug-control">
+      <span>Pre-rendered ring blur</span>
+      <span class="debug-value" data-debug-value="ringSpriteBlur"></span>
+      <input type="range" min="0" max="25" step="1" data-debug-setting="ringSpriteBlur">
+    </label>
+  </div>
+
+  <div class="debug-section">
+    <div class="debug-section-title">Extra Load</div>
+    <label class="debug-control">
+      <span>Particles</span>
+      <span class="debug-value" data-debug-value="particleCount"></span>
+      <input type="range" min="0" max="60" step="1" data-debug-setting="particleCount">
+    </label>
+    <label class="debug-control">
+      <span>Particles FPS</span>
+      <span class="debug-value" data-debug-value="particleFps"></span>
+      <input type="range" min="1" max="60" step="1" data-debug-setting="particleFps">
+    </label>
+    <label class="debug-control">
+      <span>Glow intensity</span>
+      <span class="debug-value" data-debug-value="glowIntensity"></span>
+      <input type="range" min="0" max="150" step="1" data-debug-setting="glowIntensity">
+    </label>
+    <label class="debug-control">
+      <span>Canvas shadows</span>
+      <input type="checkbox" data-debug-setting="shadowsEnabled">
+    </label>
+    <label class="debug-control">
+      <span>Sky flash blur</span>
+      <input type="checkbox" data-debug-setting="skyFlashBlur">
+    </label>
+  </div>
+
+  <button class="debug-reset" id="debugReset" type="button">Reset to defaults</button>
+</div>
+
+<script>
+(function () {
+  const DESIGN_W = 1080;
+  const DESIGN_H = 1920;
+  const frame = document.getElementById('frame');
+  const DEBUG_PANEL_ENABLED = new URLSearchParams(location.search).get('debug') !== '0';
+  const DEBUG_STORAGE_KEY = 'touchToCreateDebugSettingsV1';
+  const DEBUG_DEFAULTS = {
+    canvasQuality: 100,
+    plasmaFps: 30,
+    dischargeRate: 10,
+    boltSegments: 10,
+    maxRingFragments: 4,
+    mainGlowBlur: 12,
+    midGlowBlur: 3,
+    radialMainBlur: 10,
+    radialBranchBlur: 6,
+    sideBranchBlur: 6,
+    arcFragmentBlur: 6,
+    ringRunnerBlur: 6,
+    ringSpriteBlur: 11,
+    particleCount: 18,
+    particleFps: 24,
+    glowIntensity: 100,
+    shadowsEnabled: true,
+    skyFlashBlur: true,
+  };
+
+  function clampNumber(value, min, max) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return min;
+    return Math.max(min, Math.min(max, n));
+  }
+
+  function loadDebugSettings() {
+    try {
+      const raw = localStorage.getItem(DEBUG_STORAGE_KEY);
+      if (!raw) return { ...DEBUG_DEFAULTS };
+      return { ...DEBUG_DEFAULTS, ...JSON.parse(raw) };
+    } catch {
+      return { ...DEBUG_DEFAULTS };
+    }
+  }
+
+  let debugSettings = loadDebugSettings();
+  let applyDebugSettings = function () {};
+  const debugToggle = document.getElementById('debugToggle');
+  const debugPanel = document.getElementById('debugPanel');
+  const debugReset = document.getElementById('debugReset');
+  const debugFps = document.getElementById('debugFps');
+  const debugFrameMs = document.getElementById('debugFrameMs');
+  const debugCanvasInfo = document.getElementById('debugCanvasInfo');
+  const debugActiveFx = document.getElementById('debugActiveFx');
+  const debugStats = {
+    fps: 0,
+    frameMs: 0,
+    activeFx: 0,
+    lastDrawTime: 0,
+    lastMetricUpdate: 0,
+  };
+
+  function shadowValue(name) {
+    return debugSettings.shadowsEnabled ? Number(debugSettings[name]) : 0;
+  }
+
+  function effectRate() {
+    return Number(debugSettings.dischargeRate) / DEBUG_DEFAULTS.dischargeRate;
+  }
+
+  function glowAlpha(value) {
+    return Math.max(0, Math.min(1, value * (Number(debugSettings.glowIntensity) / 100)));
+  }
+
+  function saveDebugSettings() {
+    try {
+      localStorage.setItem(DEBUG_STORAGE_KEY, JSON.stringify(debugSettings));
+    } catch {
+      // Ignore private-mode quota errors; live settings still work.
+    }
+  }
+
+  function syncDebugControls() {
+    document.querySelectorAll('[data-debug-setting]').forEach((el) => {
+      const key = el.dataset.debugSetting;
+      const value = debugSettings[key];
+      if (el.type === 'checkbox') {
+        el.checked = Boolean(value);
+      } else {
+        el.value = String(value);
+      }
+    });
+
+    document.querySelectorAll('[data-debug-value]').forEach((el) => {
+      const key = el.dataset.debugValue;
+      const suffix = key === 'glowIntensity' ? '%' : '';
+      el.textContent = `${debugSettings[key]}${suffix}`;
+    });
+  }
+
+  function updateDebugMetrics(now) {
+    if (!debugPanel || debugPanel.hidden || now - debugStats.lastMetricUpdate < 250) return;
+    debugStats.lastMetricUpdate = now;
+    debugFps.textContent = debugStats.fps ? debugStats.fps.toFixed(0) : '--';
+    debugFrameMs.textContent = debugStats.frameMs ? debugStats.frameMs.toFixed(1) : '--';
+    debugCanvasInfo.textContent = `${debugSettings.canvasQuality}%`;
+    debugActiveFx.textContent = String(debugStats.activeFx);
+  }
+
+  function setDebugSetting(key, value) {
+    const defaultsValue = DEBUG_DEFAULTS[key];
+    if (typeof defaultsValue === 'boolean') {
+      debugSettings[key] = Boolean(value);
+    } else {
+      debugSettings[key] = Number(value);
+    }
+    saveDebugSettings();
+    syncDebugControls();
+    applyDebugSettings();
+  }
+
+  function initDebugPanel() {
+    if (!DEBUG_PANEL_ENABLED) {
+      debugToggle.hidden = true;
+      debugPanel.hidden = true;
+      return;
+    }
+
+    debugToggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      debugPanel.hidden = !debugPanel.hidden;
+    });
+    debugToggle.addEventListener('pointerdown', (e) => e.stopPropagation());
+    debugPanel.addEventListener('pointerdown', (e) => e.stopPropagation());
+    debugPanel.addEventListener('click', (e) => e.stopPropagation());
+
+    document.querySelectorAll('[data-debug-setting]').forEach((el) => {
+      const eventName = el.type === 'checkbox' || el.tagName === 'SELECT' ? 'change' : 'input';
+      el.addEventListener(eventName, () => {
+        setDebugSetting(el.dataset.debugSetting, el.type === 'checkbox' ? el.checked : el.value);
+      });
+    });
+
+    debugReset.addEventListener('click', () => {
+      debugSettings = { ...DEBUG_DEFAULTS };
+      saveDebugSettings();
+      syncDebugControls();
+      applyDebugSettings();
+    });
+
+    syncDebugControls();
+  }
+
+  initDebugPanel();
+
+  // --- Scale + rotate frame to fit viewport ---
+  // The vertical touchscreen has no rotate-to-portrait function, so the entire
+  // 1080×1920 frame is CSS-rotated. The current rotation is one of {0, 90, 180,
+  // 270} degrees clockwise and is controlled remotely via the /api/state endpoint
+  // (see "remote control" block further down).
+  let frameRotation = 90;   // default — matches the live touchscreen install
+  // ?rotate=N in the URL overrides the default for one-off testing.
+  (function readRotationFromUrl() {
+    const v = Number(new URLSearchParams(location.search).get('rotate'));
+    if ([0, 90, 180, 270].includes(v)) frameRotation = v;
+  })();
+
+  function isFullscreenActive() {
+    return !!(document.fullscreenElement || document.webkitFullscreenElement);
+  }
+  function isRotated90or270() {
+    return frameRotation === 90 || frameRotation === 270;
+  }
+  function fitFrame() {
+    // For 90° / 270° the rotated AABB swaps W/H; for 0° / 180° it stays.
+    const swap = isRotated90or270();
+    const rotatedW = swap ? DESIGN_H : DESIGN_W;
+    const rotatedH = swap ? DESIGN_W : DESIGN_H;
+    const isMobile = window.innerWidth < 800;
+    const isFs = isFullscreenActive();
+    let s;
+    if (isFs) {
+      const sx = window.innerWidth  / rotatedW;
+      const sy = window.innerHeight / rotatedH;
+      s = Math.min(sx, sy);
+    } else if (isMobile) {
+      s = window.innerHeight / rotatedH;
+    } else {
+      const pad = 40;
+      const sx = (window.innerWidth  - pad) / rotatedW;
+      const sy = (window.innerHeight - pad) / rotatedH;
+      s = Math.min(sx, sy, 1);
+    }
+    frame.style.position = 'absolute';
+    frame.style.top = '50%';
+    frame.style.left = '50%';
+    frame.style.transform =
+      `translate(-50%, -50%) rotate(${frameRotation}deg) scale(${s})`;
+    frame.style.boxShadow = (isMobile || isFs) ? 'none' : '0 0 60px rgba(0,0,0,0.5)';
+  }
+  fitFrame();
+  window.addEventListener('resize', fitFrame);
+  document.addEventListener('fullscreenchange', fitFrame);
+  document.addEventListener('webkitfullscreenchange', fitFrame);
+
+  // --- Remote control: poll /api/state for rotation changes ---
+  // Backed by Vercel KV. The control panel at /control posts new values; the
+  // display picks them up on the next poll (~2s) without a reload.
+  (function setupRemoteControl() {
+    let lastUpdatedAt = -1;
+    async function poll() {
+      try {
+        const r = await fetch('/api/state', { cache: 'no-store' });
+        if (!r.ok) return;
+        const j = await r.json();
+        // Ignore initial response if we already have a URL-supplied rotation
+        // and there's no remote update yet.
+        if (j && j.updatedAt === 0 && lastUpdatedAt < 0) {
+          lastUpdatedAt = 0;
+          return;
+        }
+        if (j && j.updatedAt !== lastUpdatedAt) {
+          lastUpdatedAt = j.updatedAt;
+          if ([0, 90, 180, 270].includes(j.rotation) && j.rotation !== frameRotation) {
+            frameRotation = j.rotation;
+            fitFrame();
+          }
+        }
+      } catch { /* offline — leave rotation as-is */ }
+    }
+    poll();
+    setInterval(poll, 5000);   // v3 perf: was 2000ms
+  })();
+
+  // --- Fullscreen toggle button ---
+  // Visible at page load for 15s, then auto-hides. On click toggles fullscreen;
+  // when fullscreen state changes the button morphs (enter ↔ exit) and is shown
+  // again for another 15s before hiding.
+  (function setupFsButton() {
+    const fsBtn = document.getElementById('fsBtn');
+    if (!fsBtn) return;
+    const iconEnter = fsBtn.querySelector('.fs-icon-enter');
+    const iconExit  = fsBtn.querySelector('.fs-icon-exit');
+    let hideTimer = null;
+
+    function isFullscreen() {
+      return !!(document.fullscreenElement || document.webkitFullscreenElement);
+    }
+    function updateIcon() {
+      const fs = isFullscreen();
+      if (iconEnter) iconEnter.style.display = fs ? 'none' : '';
+      if (iconExit)  iconExit.style.display  = fs ? '' : 'none';
+      fsBtn.setAttribute('aria-label', fs ? 'Exit fullscreen' : 'Enter fullscreen');
+    }
+    function showFor15s() {
+      fsBtn.classList.remove('hidden');
+      if (hideTimer) clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => fsBtn.classList.add('hidden'), 15000);
+    }
+
+    fsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (isFullscreen()) {
+        (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+      } else {
+        const el = document.documentElement;
+        (el.requestFullscreen || el.webkitRequestFullscreen).call(el);
+      }
+    });
+    // Stop button taps from triggering the lightning activation on the canvas.
+    fsBtn.addEventListener('mousedown',  (e) => e.stopPropagation());
+    fsBtn.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
+
+    document.addEventListener('fullscreenchange', () => { updateIcon(); showFor15s(); });
+    document.addEventListener('webkitfullscreenchange', () => { updateIcon(); showFor15s(); });
+
+    updateIcon();
+    showFor15s();
+  })();
+
+  // --- Language switcher ---
+  const langBtn = document.getElementById('langBtn');
+  const touchText = document.getElementById('touchText');
+  const ticketsLabel = document.getElementById('ticketsLabel');
+  const infoTicketsLabel = document.getElementById('infoTicketsLabel');
+  // Cycle through three languages: EN → LV → RU → EN. The button label always
+  // shows the *next* language in the cycle (so the user knows what they'll get
+  // by pressing it).
+  const LANG_ORDER = ['en', 'lv', 'ru'];
+  const I18N = {
+    en: {
+      next: 'LV',
+      touch: 'Touch to Create',
+      tickets: 'Tickets',
+      intro1: 'ENTER THE',
+      intro2: '360° EXPERIENCE',
+      main:   'IMMERSIVE',
+      main2:  'EXHIBITION',
+    },
+    lv: {
+      next: 'RU',
+      touch: 'Pieskaries, lai izveidotu',
+      tickets: 'Biļetes',
+      intro1: 'IENĀC',
+      intro2: '360° PIEREDZĒ',
+      main:   'IMERSĪVA',
+      main2:  'IZSTĀDE',
+    },
+    ru: {
+      next: 'EN',
+      touch: 'Прикоснись и создай',
+      tickets: 'Билеты',
+      intro1: 'ОЩУТИ',
+      intro2: 'МИР 360°',
+      main:   'ВЫСТАВКА',
+      main2:  'ПОГРУЖЕНИЯ',
+    },
+  };
+  let lang = 'en';
+
+  // Reflect the current language as a body class so CSS can adapt sizing
+  // (e.g. shrink the big active-state words for Russian which is wider).
+  function applyLangClass() {
+    document.body.classList.remove('lang-en', 'lang-lv', 'lang-ru');
+    document.body.classList.add('lang-' + lang);
+  }
+  applyLangClass();
+
+  langBtn.addEventListener('mousedown', (e) => { e.stopPropagation(); });
+  langBtn.addEventListener('touchstart', (e) => { e.stopPropagation(); });
+  langBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    unlockAudio();
+    playSfx(sfx.language);
+    // Advance to the next language in the cycle
+    const idx = LANG_ORDER.indexOf(lang);
+    lang = LANG_ORDER[(idx + 1) % LANG_ORDER.length];
+    applyLangClass();
+    const t = I18N[lang];
+    langBtn.textContent = t.next;
+    new TextScramble(touchText).setText(t.touch);
+    new TextScramble(ticketsLabel).setText(t.tickets);
+    new TextScramble(infoTicketsLabel).setText(t.tickets);
+  });
+
+  // --- Info panel ---
+  const infoBtn = document.getElementById('infoBtn');
+  const infoPanel = document.getElementById('infoPanel');
+  const infoClose = document.getElementById('infoClose');
+  const infoPanelContent = document.getElementById('infoPanelContent');
+
+  const infoTexts = {
+    en: `
+      <div class="info-title">Michelangelo</div>
+      <p class="info-text">A new large-scale 360° immersive exhibition at Digital Art House.</p>
+      <p class="info-text">Discover the genius of the High Renaissance — <strong>Michelangelo Buonarroti</strong>.</p>
+      <p class="info-text">Begin with a short introductory film.<br>Then — 50 minutes of full immersion.</p>
+      <p class="info-text highlight">Light. Scale. Movement. Sound.</p>
+      <p class="info-text">This is not a museum visit.<br>It is a true touch of Eternity.</p>
+      <p class="info-details">📍 Digital Art House, Skolas 2<br>🎟 Tickets: digitalarthouse.eu</p>
+      <p class="info-hashtags">#DigitalArtHouse #Michelangelo #ImmersiveArt #RigaEvents #ArtExperience</p>
+    `,
+    lv: `
+      <div class="info-title">Michelangelo</div>
+      <p class="info-text">Jauna, vērienīga 360° imersīvā izstāde „Digital Art House".</p>
+      <p class="info-text">Atklājiet augstās renesanses ģēniju — <strong>Mičelanjelo Buonarroti</strong>.</p>
+      <p class="info-text">Sāciet ar īsu ievada filmu.<br>Pēc tam — 50 minūtes pilnīgas imersijas.</p>
+      <p class="info-text highlight">Gaisma. Mērogs. Kustība. Skaņa.</p>
+      <p class="info-text">Šī nav parasta muzeja apmeklējuma pieredze.<br>Tā ir patiesa saskare ar mūžību.</p>
+      <p class="info-details">📍 Digital Art House, Skolas 2<br>🎟 Biļetes: digitalarthouse.eu</p>
+      <p class="info-hashtags">#DigitalArtHouse #Michelangelo #ImmersiveArt #RigaEvents #ArtExperience</p>
+    `,
+    ru: `
+      <div class="info-title">Микеланджело</div>
+      <p class="info-text">Новая масштабная 360° иммерсивная выставка в Digital Art House.</p>
+      <p class="info-text">Откройте для себя гения Высокого Возрождения — <strong>Микеланджело Буонарроти</strong>.</p>
+      <p class="info-text">Начните с короткого вступительного фильма.<br>Затем — 50 минут полного погружения.</p>
+      <p class="info-text highlight">Свет. Масштаб. Движение. Звук.</p>
+      <p class="info-text">Это не визит в музей.<br>Это настоящее прикосновение к Вечности.</p>
+      <p class="info-details">📍 Digital Art House, Skolas 2<br>🎟 Билеты: digitalarthouse.eu</p>
+      <p class="info-hashtags">#DigitalArtHouse #Michelangelo #ImmersiveArt #RigaEvents #ArtExperience</p>
+    `
+  };
+
+  const infoBgVideo = document.getElementById('infoBgVideo');
+
+  function openInfo() {
+    infoPanelContent.innerHTML = infoTexts[lang];
+    // Re-append the close button as the last flex child so it sits 50px below text
+    infoPanelContent.appendChild(infoClose);
+    frame.classList.add('info-open');
+    infoPanel.classList.add('visible');
+    infoBgVideo.currentTime = 0;
+    infoBgVideo.play();
+  }
+
+  function closeInfo() {
+    playSfx(sfx.exit);
+    infoPanel.classList.remove('visible');
+    infoBgVideo.pause();
+    setTimeout(() => frame.classList.remove('info-open'), 300);
+  }
+
+  infoBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    unlockAudio();
+    playSfx(sfx.info);
+    openInfo();
+  });
+  infoBtn.addEventListener('mousedown', (e) => { e.stopPropagation(); });
+  infoBtn.addEventListener('touchstart', (e) => { e.stopPropagation(); });
+  infoClose.addEventListener('click', closeInfo);
+  infoPanel.addEventListener('click', closeInfo);
+
+  // --- Rive setup ---
+  const handCanvas = document.getElementById('hand-canvas');
+  let riveInstance = null;
+  let isPressedInput = null;
+
+  // Manual drawing-surface sizing — independent of CSS transform on the parent
+  // (the frame is rotated 90°; Rive's resizeDrawingSurfaceToCanvas reads the
+  // bounding rect, which after rotation gives swapped width/height → squash).
+  // We force the drawing surface to match the canvas's CSS dimensions exactly.
+  const HAND_CSS_W = 900;
+  const HAND_CSS_H = 1500;
+  // Multiplier for rendering crispness without changing aspect ratio.
+  // v3 perf: was 2, downsized to 1 — saves ~75% of Rive's per-frame raster work
+  // (from 5.4 MP down to 1.35 MP). The hand reads slightly softer up close on
+  // very large screens but is invisible on the touchscreen at normal viewing.
+  const HAND_RES_SCALE = 1;
+  function sizeHandCanvas() {
+    const w = HAND_CSS_W * HAND_RES_SCALE;
+    const h = HAND_CSS_H * HAND_RES_SCALE;
+    if (handCanvas.width !== w)  handCanvas.width  = w;
+    if (handCanvas.height !== h) handCanvas.height = h;
+  }
+  sizeHandCanvas();
+
+  const r = new rive.Rive({
+    src: 'assets/hand.riv',
+    canvas: handCanvas,
+    autoplay: true,
+    stateMachines: 'State Machine 1',
+    fit: rive.Fit.Contain,
+    alignment: rive.Alignment.Center,
+    onLoad: () => {
+      riveInstance = r;
+      const inputs = r.stateMachineInputs('State Machine 1');
+      if (inputs) {
+        isPressedInput = inputs.find(i => i.name === 'isPressed');
+        console.log('Rive loaded. Inputs:', inputs.map(i => i.name));
+      }
+      sizeHandCanvas();
+    },
+    onLoadError: (e) => {
+      console.error('Rive load error:', e);
+    }
+  });
+
+  // --- Circle interaction ---
+  const btn = document.getElementById('circleBtn');
+
+  const titleMain = document.getElementById('titleMain');
+  const titleSub = document.getElementById('titleSub');
+  const titleMainLine2 = document.getElementById('titleMainLine2');
+  const introLine1 = document.getElementById('introLine1');
+  const introLine2 = document.getElementById('introLine2');
+
+  // --- Text Scramble (airport flip board effect) ---
+  // v5: Random per-character opacity fade.
+  //
+  // Algorithm: on setText(newText) we wrap the OLD text in <span>s with random
+  // transition-delay, flip them all to opacity 0 → each letter fades out in
+  // random order. After the fade-out completes we wrap the NEW text in spans
+  // (initial opacity 0) with their own random delays and flip to 1 → each new
+  // letter appears in random order.
+  //
+  // The ENTIRE fade animation runs on the GPU via CSS opacity transitions —
+  // JS does no per-frame work. Compared to the old per-frame innerHTML
+  // scramble or the typewriter setTimeout chain, runtime cost during the
+  // animation drops to roughly zero.
+  class TextScramble {
+    constructor(el) {
+      this.el = el;
+      this.timeoutId = null;
+      this.FADE_MS      = 220;   // duration of each letter's fade
+      this.MAX_DELAY_MS = 450;   // random delay window per letter
+    }
+    setText(newText) {
+      if (this.timeoutId) { clearTimeout(this.timeoutId); this.timeoutId = null; }
+      const oldText = this.el.textContent;
+      return new Promise((resolve) => {
+        if (oldText.length === 0) {
+          this._fadeIn(newText, resolve);
+        } else {
+          this._fadeOutThen(oldText, newText, resolve);
+        }
+      });
+    }
+    _esc(ch) {
+      if (ch === ' ') return ' ';   // non-breaking space so spans hold a slot
+      if (ch === '<') return '&lt;';
+      if (ch === '>') return '&gt;';
+      if (ch === '&') return '&amp;';
+      return ch;
+    }
+    _buildSpans(text, initialOpacity) {
+      let html = '';
+      for (const ch of text) {
+        const delay = Math.floor(Math.random() * this.MAX_DELAY_MS);
+        html += `<span style="opacity:${initialOpacity};transition:opacity ${this.FADE_MS}ms ease-in-out ${delay}ms">${this._esc(ch)}</span>`;
+      }
+      return html;
+    }
+    _fadeOutThen(oldText, newText, resolve) {
+      this.el.innerHTML = this._buildSpans(oldText, '1');
+      // Wait two animation frames so the browser actually commits the
+      // initial opacity:1 paint BEFORE we flip to 0 — otherwise some
+      // engines collapse both into one paint and skip the transition
+      // (the user sees the text appear/disappear instantly instead of
+      // fading per letter).
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const spans = this.el.querySelectorAll('span');
+          for (const s of spans) s.style.opacity = '0';
+        });
+      });
+      this.timeoutId = setTimeout(() => {
+        this._fadeIn(newText, resolve);
+      }, this.FADE_MS + this.MAX_DELAY_MS + 60);
+    }
+    _fadeIn(newText, resolve) {
+      if (newText.length === 0) {
+        this.el.textContent = '';
+        this.timeoutId = null;
+        resolve();
+        return;
+      }
+      this.el.innerHTML = this._buildSpans(newText, '0');
+      // Same double-RAF: ensure opacity:0 commits to a real paint before
+      // we flip to 1, so the per-letter fade-in actually animates instead
+      // of the text appearing instantly at full opacity.
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const spans = this.el.querySelectorAll('span');
+          for (const s of spans) s.style.opacity = '1';
+        });
+      });
+      this.timeoutId = setTimeout(() => {
+        // Cleanup: collapse back to plain text so next setText reads textContent cleanly
+        this.el.textContent = newText;
+        this.timeoutId = null;
+        resolve();
+      }, this.FADE_MS + this.MAX_DELAY_MS + 80);
+    }
+  }
+
+  const fxMain = new TextScramble(titleMain);
+  const fxSub = new TextScramble(titleSub);
+  const fxMainLine2 = new TextScramble(titleMainLine2);
+  const fxIntro1 = new TextScramble(introLine1);
+  const fxIntro2 = new TextScramble(introLine2);
+
+  // --- Flash overlay (full-screen for initial burst) ---
+  // mix-blend-mode: screen — the white layer additively brightens whatever is underneath
+  // (sky/clouds/particles) instead of sitting on top as a flat white wash.
+  const flashOverlay = document.createElement('div');
+  flashOverlay.style.cssText = 'position:absolute;inset:0;background:#fff;opacity:0;z-index:6;pointer-events:none;transition:opacity 0.08s;mix-blend-mode:screen;';
+  frame.appendChild(flashOverlay);
+
+  // --- Sky flash overlay (localized radial gradients at random positions) ---
+  // screen blend + heavy blur + low opacity = the gradient circle dissolves into a soft
+  // brightness bloom that feels like light spreading inside the clouds.
+  const skyFlashOverlay = document.createElement('div');
+  skyFlashOverlay.style.cssText = 'position:absolute;inset:-120px;opacity:0;z-index:6;pointer-events:none;transition:opacity 0.06s;mix-blend-mode:screen;';
+  frame.appendChild(skyFlashOverlay);
+
+  function updateSkyFlashBlur() {
+    skyFlashOverlay.style.filter = debugSettings.skyFlashBlur ? 'blur(55px)' : 'none';
+  }
+
+  // Random positions across the whole screen
+  const skyFlashPositions = [
+    // Upper area
+    { x: '15%', y: '8%'  },
+    { x: '85%', y: '10%' },
+    { x: '50%', y: '5%'  },
+    { x: '35%', y: '18%' },
+    { x: '70%', y: '20%' },
+    // Middle area
+    { x: '10%', y: '40%' },
+    { x: '90%', y: '38%' },
+    { x: '25%', y: '50%' },
+    { x: '75%', y: '48%' },
+    { x: '50%', y: '42%' },
+    // Lower area
+    { x: '15%', y: '72%' },
+    { x: '85%', y: '70%' },
+    { x: '45%', y: '85%' },
+    { x: '60%', y: '80%' },
+    { x: '25%', y: '90%' },
+  ];
+
+  // Generation counter — lets us cancel timeouts from older flashes when a new one kicks in
+  let flashGen = 0;
+
+  function randomSkyFlash() {
+    const pos = skyFlashPositions[Math.floor(Math.random() * skyFlashPositions.length)];
+    // Bias toward small: most flashes stay around the base size, occasional huge ones
+    // pow(rand, 1.8) concentrates values near 0 → most multipliers are small, rare ones approach max
+    const sizeMul = 1 + Math.pow(Math.random(), 1.8) * 2.2; // ≈ 1.0 … 3.2
+    const radius = 350 * sizeMul;
+    // Larger flashes read as brighter so we taper intensity a bit for the huge ones
+    const baseIntensity = 0.14 + Math.random() * 0.16;
+    const intensity = baseIntensity * (0.7 + 0.3 / sizeMul); // smaller = fuller brightness
+    const myGen = ++flashGen;
+
+    skyFlashOverlay.style.background =
+      `radial-gradient(circle ${radius}px at ${pos.x} ${pos.y}, rgba(230,240,255,${intensity}) 0%, rgba(200,220,255,${intensity * 0.55}) 35%, rgba(170,200,255,${intensity * 0.2}) 60%, rgba(150,190,255,0) 85%)`;
+
+    // Strobe: rapid flicker in the first ~130ms — matches how real lightning fires
+    // multiple return strokes in quick succession before fading out.
+    const strobe = [
+      { t: 0,   op: '1' },
+      { t: 22,  op: '0.18' },
+      { t: 42,  op: '1' },
+      { t: 65,  op: '0.25' },
+      { t: 88,  op: '0.95' },
+      { t: 112, op: '0.4' },
+      { t: 132, op: '0.85' },
+    ];
+
+    strobe.forEach(({ t, op }) => {
+      setTimeout(() => {
+        if (myGen !== flashGen) return;
+        skyFlashOverlay.style.transition = 'none';
+        skyFlashOverlay.style.opacity = op;
+      }, t);
+    });
+
+    // Smooth fade to 0 after the strobe
+    setTimeout(() => {
+      if (myGen !== flashGen) return;
+      skyFlashOverlay.style.transition = 'opacity 0.25s ease-out';
+      skyFlashOverlay.style.opacity = '0';
+    }, 160 + Math.random() * 50);
+  }
+
+  let flashInterval = null;
+
+  function triggerFlashes() {
+    // Initial press burst — full-screen white, keeps its punch
+    const delays = [50, 200, 400, 1400, 1550, 1750];
+    delays.forEach(d => {
+      setTimeout(() => {
+        flashOverlay.style.opacity = '0.7';
+        setTimeout(() => { flashOverlay.style.opacity = '0'; }, 50);
+      }, d);
+    });
+
+    scheduleNextFlashEvent();
+  }
+
+  // Recursive scheduler — produces truly random gaps + random event sizes,
+  // alternating between quiet periods and storm bursts like real weather.
+  function scheduleNextFlashEvent() {
+    if (!isActive) return;
+
+    // Pick a "mood" for the next gap
+    const mood = Math.random();
+    let delay;
+    if (mood < 0.35) {
+      // Long quiet: 5–12 s — the sky goes still
+      delay = 5000 + Math.random() * 7000;
+    } else if (mood < 0.85) {
+      // Normal gap: 1.2–4 s
+      delay = 1200 + Math.random() * 2800;
+    } else {
+      // Close follow-up: 0.3–1.2 s — chained events
+      delay = 300 + Math.random() * 900;
+    }
+
+    flashInterval = setTimeout(() => {
+      if (!isActive) return;
+
+      // Pick an event type
+      const roll = Math.random();
+      if (roll < 0.55) {
+        // 55% — single flash
+        randomSkyFlash();
+      } else if (roll < 0.86) {
+        // 31% — short chain 2–4 flashes
+        const n = 2 + Math.floor(Math.random() * 3);
+        for (let i = 0; i < n; i++) {
+          setTimeout(randomSkyFlash, i * (70 + Math.random() * 200));
+        }
+      } else {
+        // 14% — big burst 5–10 flashes across the sky
+        const n = 5 + Math.floor(Math.random() * 6);
+        for (let i = 0; i < n; i++) {
+          setTimeout(randomSkyFlash, i * (60 + Math.random() * 160));
+        }
+      }
+
+      scheduleNextFlashEvent();
+    }, delay);
+  }
+
+  function stopFlashes() {
+    if (flashInterval) { clearTimeout(flashInterval); flashInterval = null; }
+  }
+
+  // ==================================================================
+  //   AUDIO ENGINE — Web Audio API for gapless looping of bg tracks
+  //   Files expected (any missing ones are silently ignored):
+  //     assets/audio/idle.ogg    — looped ambient track (idle state)
+  //     assets/audio/active.ogg  — looped track while button is held
+  //     assets/audio/press_2.mp3 — press SFX, looped while button is held
+  //     assets/audio/release.mp3 — one-shot SFX on release
+  //
+  //   idle/active use AudioBufferSourceNode.loop=true → bit-perfect
+  //   gapless looping (no pop or silence between iterations).
+  //   press/release stay as HTML <Audio> (one-shots, no loop issues).
+  // ==================================================================
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  const audioCtx = AudioCtx ? new AudioCtx() : null;
+  const masterGain = audioCtx ? audioCtx.createGain() : null;
+  if (masterGain) masterGain.connect(audioCtx.destination);
+
+  // Looping tracks (Web Audio)
+  // Use .ogg (Vorbis) instead of .mp3 — OGG has NO encoder padding so it loops
+  // bit-perfect gapless. MP3 always has ~1057 samples of silence at the start (LAME
+  // encoder padding) which Web Audio dutifully includes in the loop, causing a hiccup.
+  const loopTracks = {
+    idle:   { url: 'assets/audio/idle.ogg',   target: 0.6, buffer: null, source: null, gain: null, failed: false },
+    active: { url: 'assets/audio/active.ogg', target: 0.6, buffer: null, source: null, gain: null, failed: false },
+  };
+
+  // One-shot SFX (HTML Audio — no looping issues here)
+  const sfx = {};
+  function makeSfx(src, vol = 1) {
+    const a = new Audio(src);
+    a.volume = vol;
+    a.addEventListener('error', () => { a._failed = true; });
+    return a;
+  }
+  sfx.press    = makeSfx('assets/audio/press_2.mp3',  0.4);
+  sfx.release  = makeSfx('assets/audio/release.mp3',  0.5);
+  sfx.language = makeSfx('assets/audio/language.mp3', 0.3);
+  sfx.info     = makeSfx('assets/audio/info.mp3',     0.7);
+  sfx.exit     = makeSfx('assets/audio/exit.mp3',     0.7);
+  // press is held while the button is held — loop it so it doesn't stop after 1 play
+  sfx.press.loop = true;
+
+  // Decode an mp3 into an AudioBuffer
+  async function decodeTrack(t) {
+    if (!audioCtx) { t.failed = true; return; }
+    try {
+      const resp = await fetch(t.url);
+      if (!resp.ok) throw new Error('not found');
+      const arr = await resp.arrayBuffer();
+      t.buffer = await audioCtx.decodeAudioData(arr);
+    } catch (e) {
+      t.failed = true;
+    }
+  }
+
+  // === CROSSFADE LOOP ENGINE ===
+  // Instead of relying on source.loop=true (which exposes any silence/seam in the
+  // file), we play two overlapping copies of the same buffer and crossfade between
+  // iterations. The seam is masked by the overlap.
+  // Each track has:
+  //   t.outputGain — master gain for the whole track (press/release fades target this)
+  //   t.scheduling — flag, true while the loop is "running" (we keep scheduling new iterations)
+  //   t._timer    — scheduled setTimeout for next iteration
+
+  const CROSSFADE_SEC = 3; // overlap between iterations (longer = smoother seam)
+
+  function ensureOutputGain(t) {
+    if (!t.outputGain) {
+      t.outputGain = audioCtx.createGain();
+      t.outputGain.gain.value = 0;
+      t.outputGain.connect(masterGain);
+    }
+  }
+
+  // Schedule a single iteration that fades in, plays, then fades out near its end.
+  // After scheduling the iteration, queues the NEXT one to start at (end - crossfade).
+  function scheduleIteration(t, startTime) {
+    if (!t.scheduling || t.failed || !t.buffer) return;
+    const dur = t.buffer.duration;
+
+    const source = audioCtx.createBufferSource();
+    source.buffer = t.buffer;
+    source.loop = false; // we handle looping manually via overlapping iterations
+
+    const gain = audioCtx.createGain();
+    gain.gain.value = 0;
+    source.connect(gain).connect(t.outputGain);
+    source.start(startTime);
+
+    // Fade-in at the very beginning of this iteration
+    gain.gain.setValueAtTime(0, startTime);
+    gain.gain.linearRampToValueAtTime(1, startTime + CROSSFADE_SEC);
+
+    // Fade-out at the end so it overlaps with the next iteration's fade-in
+    const fadeOutStart = startTime + dur - CROSSFADE_SEC;
+    gain.gain.setValueAtTime(1, fadeOutStart);
+    gain.gain.linearRampToValueAtTime(0, fadeOutStart + CROSSFADE_SEC);
+
+    // Schedule next iteration to start when this one begins fading out (= end - crossfade)
+    const msUntilNext = (fadeOutStart - audioCtx.currentTime) * 1000;
+    t._timer = setTimeout(() => {
+      if (t.scheduling) scheduleIteration(t, audioCtx.currentTime);
+    }, Math.max(0, msUntilNext));
+  }
+
+  // Start (or restart) a track. restart=true wipes any in-flight iterations and starts fresh.
+  function startLoopTrack(t, fadeMs = 1000, restart = false) {
+    if (t.failed || !t.buffer) return;
+    ensureOutputGain(t);
+    const now = audioCtx.currentTime;
+
+    if (t.scheduling && !restart) {
+      // Already looping — just bring outputGain back up
+      t.outputGain.gain.cancelScheduledValues(now);
+      t.outputGain.gain.setValueAtTime(t.outputGain.gain.value, now);
+      t.outputGain.gain.linearRampToValueAtTime(t.target, now + fadeMs / 1000);
+      return;
+    }
+
+    // Hard restart — cancel any pending scheduling
+    if (t._timer) { clearTimeout(t._timer); t._timer = null; }
+    t.scheduling = true;
+
+    // Bring master gain to target over fadeMs
+    t.outputGain.gain.cancelScheduledValues(now);
+    t.outputGain.gain.setValueAtTime(t.outputGain.gain.value, now);
+    t.outputGain.gain.linearRampToValueAtTime(t.target, now + fadeMs / 1000);
+
+    // Start the first iteration immediately (no leading silence — first iteration
+    // fades in over CROSSFADE_SEC, so we offset start by -CROSSFADE_SEC to skip
+    // the inaudible part). For simplicity, just start at "now"; the very first
+    // iteration will ramp from 0 to 1 over CROSSFADE_SEC, on top of the master
+    // fade. Slight double-fade is fine.
+    scheduleIteration(t, now);
+  }
+
+  // Fade a track's master gain to targetVal (does not stop the iteration scheduler)
+  function fadeLoopTrack(t, targetVal, fadeMs = 1000) {
+    if (t.failed || !t.outputGain) return;
+    const now = audioCtx.currentTime;
+    t.outputGain.gain.cancelScheduledValues(now);
+    t.outputGain.gain.setValueAtTime(t.outputGain.gain.value, now);
+    t.outputGain.gain.linearRampToValueAtTime(targetVal, now + fadeMs / 1000);
+  }
+
+  // Try to play an HTML Audio SFX, swallow autoplay errors
+  function playSfx(el) {
+    if (!el || el._failed) return;
+    if (el._fadeRAF) { cancelAnimationFrame(el._fadeRAF); el._fadeRAF = null; }
+    el.currentTime = 0;
+    el.volume = el._origVolume !== undefined ? el._origVolume : el.volume;
+    const p = el.play();
+    if (p && p.catch) p.catch(() => {});
+  }
+
+  // Fade out an HTML Audio SFX over fadeMs, then pause it
+  function fadeOutSfx(el, fadeMs) {
+    if (!el || el._failed || el.paused) return;
+    if (el._fadeRAF) cancelAnimationFrame(el._fadeRAF);
+    if (el._origVolume === undefined) el._origVolume = el.volume;
+    const startVol = el.volume;
+    const startT = performance.now();
+    const step = () => {
+      const t = Math.min((performance.now() - startT) / fadeMs, 1);
+      el.volume = Math.max(0, startVol * (1 - t));
+      if (t < 1) {
+        el._fadeRAF = requestAnimationFrame(step);
+      } else {
+        try { el.pause(); } catch (e) {}
+        el.volume = el._origVolume; // restore for next play
+        el._fadeRAF = null;
+      }
+    };
+    step();
+  }
+
+  // First user interaction: resume AudioContext, decode + start idle
+  let audioUnlocked = false;
+  async function unlockAudio() {
+    if (audioUnlocked || !audioCtx) return;
+    audioUnlocked = true;
+    if (audioCtx.state === 'suspended') {
+      try { await audioCtx.resume(); } catch (e) {}
+    }
+    // Decode both tracks in parallel; active is ready by the time it's needed
+    await Promise.all([decodeTrack(loopTracks.idle), decodeTrack(loopTracks.active)]);
+    startLoopTrack(loopTracks.idle, 1500);
+  }
+
+  function audioOnPress() {
+    unlockAudio();
+    playSfx(sfx.press);
+    // 1-second crossfade idle → active
+    fadeLoopTrack(loopTracks.idle, 0, 1000);
+    startLoopTrack(loopTracks.active, 1000, true); // restart from beginning each press
+  }
+
+  function audioOnRelease() {
+    // Fade out press SFX (which may still be playing) over 0.5s
+    fadeOutSfx(sfx.press, 500);
+    playSfx(sfx.release);
+    // 1-second crossfade back: active down, idle up (idle source kept running)
+    fadeLoopTrack(loopTracks.active, 0, 1000);
+    startLoopTrack(loopTracks.idle, 1000); // resume gain on the still-running idle source
+  }
+
+  function activate() {
+    wasActive = true;
+    // Cancel any pending text-revert from a recent release. If the user
+    // re-presses within the 5 s hold window OR mid-fade, the fade is
+    // aborted, opacity is restored, and we proceed with the active scramble.
+    cancelPendingTextRevert();
+
+    btn.classList.add('active');
+    frame.classList.add('active');
+    isActive = true;
+    if (isPressedInput) isPressedInput.value = true;
+    audioOnPress();
+    const t = I18N[lang] || I18N.en;
+    const intro1Text = t.intro1;
+    const intro2Text = t.intro2;
+    const mainText   = t.main;
+    const main2Text  = t.main2;
+    const subText   = "Michelangelo — El tocco dell'Eterno";
+
+    introLine1.classList.add('scrambling');
+    introLine2.classList.add('scrambling');
+    titleMain.classList.add('scrambling');
+    titleMainLine2.classList.add('scrambling');
+    titleSub.classList.add('scrambling');
+    fxIntro1.setText(intro1Text).then(() => introLine1.classList.remove('scrambling'));
+    fxIntro2.setText(intro2Text).then(() => introLine2.classList.remove('scrambling'));
+    fxMain.setText(mainText).then(() => titleMain.classList.remove('scrambling'));
+    fxMainLine2.setText(main2Text).then(() => titleMainLine2.classList.remove('scrambling'));
+    fxSub.setText(subText).then(() => titleSub.classList.remove('scrambling'));
+    triggerFlashes();
+  }
+
+  let wasActive = false;
+
+  // Text-revert timeline after release:
+  //   t=0     button released → page returns to idle (sky/storm/audio)
+  //           but the active-state words stay on screen as-is (no scramble)
+  //   t=5s    fade-out begins (opacity 1 → 0 over 1 s)
+  //   t=6s    text content swapped to idle copy, fade-in (opacity 0 → 1 over 1 s)
+  //   t=7s    inline opacity/transition cleared, sequence done
+  //
+  // If the user re-presses at any point during this 7 s sequence we cancel
+  // every pending step and instantly restore opacity = 1 so the next
+  // scramble can run normally.
+  let textRevertTimer = null;     // 5 s hold → start fade-out
+  let textSwapTimer   = null;     // +1 s   → swap text + fade-in
+  let textCleanupTimer = null;    // +1 s   → clear inline styles
+  const TEXT_HOLD_MS = 5000;
+  const TEXT_FADE_MS = 1000;      // each direction; full crossfade = 2 s
+
+  // Cached refs to logo + address (they tag along with the text revert sequence).
+  const circleLogo    = document.querySelector('.circle-logo');
+  const circleAddress = document.querySelector('.circle-address');
+
+  // Text elements that get scrambled / faded together
+  function textRevertElements() {
+    return [introLine1, introLine2, titleMain, titleMainLine2, titleSub];
+  }
+  // All elements that participate in the fade-out (text + logo/address)
+  function fadeRevertElements() {
+    return [...textRevertElements(), circleLogo, circleAddress];
+  }
+
+  function cancelPendingTextRevert() {
+    clearTimeout(textRevertTimer); textRevertTimer = null;
+    clearTimeout(textSwapTimer);   textSwapTimer   = null;
+    clearTimeout(textCleanupTimer); textCleanupTimer = null;
+    // Mid-fade abort: clear inline styles so the next scramble starts clean
+    for (const el of fadeRevertElements()) {
+      el.style.transition = '';
+      el.style.opacity = '';
+    }
+    // Drop the holding-* classes so elements fall back to default
+    // (which is fine — frame.active gets re-added immediately on press)
+    circleLogo.classList.remove('holding-active');
+    circleAddress.classList.remove('holding-active');
+    frame.classList.remove('holding-text');
+  }
+
+  function deactivate() {
+    if (!wasActive) return;
+    wasActive = false;
+    btn.classList.remove('active');
+    frame.classList.remove('active');
+    isActive = false;
+    stopFlashes();
+    audioOnRelease();
+    if (isPressedInput) isPressedInput.value = false;
+
+    // Hold the active text + logo + address on screen for 5 s, then plain
+    // opacity-fade them back over 2 s total. The .holding-text class on the
+    // frame keeps active-state CSS (display, font, size) applied to text
+    // elements; the .holding-active class does the same for logo/address.
+    cancelPendingTextRevert();
+    frame.classList.add('holding-text');
+    circleLogo.classList.add('holding-active');
+    circleAddress.classList.add('holding-active');
+
+    textRevertTimer = setTimeout(() => {
+      textRevertTimer = null;
+      const fadeEls = fadeRevertElements();
+      // Stage 1: fade out (1 s) — text + logo + address together
+      for (const el of fadeEls) {
+        el.style.transition = `opacity ${TEXT_FADE_MS}ms ease-in-out`;
+        el.style.opacity = '0';
+      }
+      // Stage 2 (at +1 s): text content swapped to idle copy. We also drop
+      // .holding-text NOW (while opacity is 0 → no visible jump) so the
+      // idle text is styled with idle CSS during the fade-in.
+      textSwapTimer = setTimeout(() => {
+        textSwapTimer = null;
+        frame.classList.remove('holding-text');
+        introLine1.textContent     = '';
+        introLine2.textContent     = '';
+        titleMain.textContent      = 'Michelangelo';
+        titleMainLine2.textContent = '';
+        titleSub.textContent       = "— El tocco dell'Eterno";
+        for (const el of textRevertElements()) el.style.opacity = '1';
+        // Stage 3 (at +2 s): clear inline styles & holding-active class
+        textCleanupTimer = setTimeout(() => {
+          textCleanupTimer = null;
+          for (const el of fadeEls) {
+            el.style.transition = '';
+            el.style.opacity = '';
+          }
+          circleLogo.classList.remove('holding-active');
+          circleAddress.classList.remove('holding-active');
+        }, TEXT_FADE_MS);
+      }, TEXT_FADE_MS);
+    }, TEXT_HOLD_MS);
+  }
+
+  // ===== Press-point tracking: bolt anchor follows the user's finger while held =====
+  // The press point updates on every move; if the finger leaves the button area,
+  // we treat that as release.
+
+  // Drag zone: the whole area BELOW the Rive hand's fingertip is draggable.
+  // The top boundary is the Rive fingertip (tipY); below that, the finger is free
+  // to move anywhere within the canvas and the bolt stretches to follow.
+  // (tipY/beamCanvas are declared further down — referenced at event time, not now.)
+
+  function eventToCanvasCoords(e) {
+    const r = beamCanvas.getBoundingClientRect();
+    const src = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]) || e;
+    const cx = src.clientX, cy = src.clientY;
+    if (cx == null || cy == null) return null;
+    // Inverse-map screen → frame's local coordinate space (1080×1920),
+    // accounting for the current frameRotation (0 / 90 / 180 / 270).
+    const swap = (frameRotation === 90 || frameRotation === 270);
+    // For 90° / 270° the canvas's screen AABB has width = 1920*scale; otherwise
+    // it has width = 1080*scale.
+    const scale = swap ? (r.width / 1920) : (r.width / 1080);
+    const centerScreenX = r.left + r.width  / 2;
+    const centerScreenY = r.top  + r.height / 2;
+    const sx = cx - centerScreenX;
+    const sy = cy - centerScreenY;
+    // Apply the inverse rotation to recover local-centred coords.
+    let lcx, lcy;
+    switch (frameRotation) {
+      case 0:   lcx =  sx; lcy =  sy; break;
+      case 90:  lcx =  sy; lcy = -sx; break;   // inverse of CSS rotate(90 cw)
+      case 180: lcx = -sx; lcy = -sy; break;
+      case 270: lcx = -sy; lcy =  sx; break;
+      default:  lcx =  sx; lcy =  sy;
+    }
+    return {
+      x: lcx / scale + 1080 / 2,
+      y: lcy / scale + 1920 / 2,
+    };
+  }
+
+  function isInsidePressArea(p) {
+    if (!p) return false;
+    // Below the Rive fingertip (with small buffer), and within the canvas
+    return p.y >= (tipY + 6) && p.x >= 0 && p.x <= 1080 && p.y <= 1920;
+  }
+
+  // Press point is locked to the button centre — dragging the finger no longer
+  // moves the bolt's anchor (the previous behaviour broke the discharge's
+  // physical logic since a real lightning origin doesn't slide around).
+  function onPressStart(e) {
+    if (e.cancelable) e.preventDefault();
+    pressX = centerX;
+    pressY = centerY;
+    activate();
+  }
+  function onPressEnd() {
+    if (!isActive) return;
+    deactivate();
+  }
+
+  btn.addEventListener('mousedown',  onPressStart);
+  window.addEventListener('mouseup',   onPressEnd);
+  btn.addEventListener('touchstart', onPressStart, { passive: false });
+  window.addEventListener('touchend',  onPressEnd);
+  window.addEventListener('touchcancel', onPressEnd);
+
+  // Unlock audio on the very first user gesture anywhere on the page
+  // (browser autoplay policy requires a user interaction before audio can play)
+  ['pointerdown', 'touchstart', 'keydown'].forEach(evt => {
+    window.addEventListener(evt, unlockAudio, { once: true, capture: true });
+  });
+
+  // --- Particles ---
+  const particleCanvas = document.getElementById('particle-canvas');
+  const pCtx = particleCanvas.getContext('2d');
+  const particles = [];
+  let PARTICLE_FRAME_MS = 1000 / debugSettings.particleFps;
+  let lastParticleFrame = 0;
+
+  function createParticle() {
+    return {
+      x: Math.random() * 1080, y: Math.random() * 1920,
+      size: Math.random() * 2 + 0.5,
+      speedX: Math.random() * 0.8 + 0.2,
+      speedY: (Math.random() - 0.5) * 0.3,
+      opacity: Math.random() * 0.4 + 0.1,
+      wobbleSpeed: Math.random() * 2 + 1,
+      wobbleAmp: Math.random() * 0.5 + 0.2,
+    };
+  }
+
+  function syncParticleCount() {
+    const target = clampNumber(debugSettings.particleCount, 0, 60);
+    while (particles.length < target) particles.push(createParticle());
+    while (particles.length > target) particles.pop();
+  }
+
+  syncParticleCount();
+
+  function applyParticleSettings() {
+    PARTICLE_FRAME_MS = 1000 / clampNumber(debugSettings.particleFps, 1, 60);
+    syncParticleCount();
+  }
+
+  function drawParticles(now = performance.now()) {
+    requestAnimationFrame(drawParticles);
+    if (lastParticleFrame && now - lastParticleFrame < PARTICLE_FRAME_MS) return;
+    lastParticleFrame = now;
+
+    pCtx.clearRect(0, 0, 1080, 1920);
+    for (const p of particles) {
+      p.x += p.speedX;
+      p.y += p.speedY + Math.sin(p.x * 0.01 * p.wobbleSpeed) * p.wobbleAmp;
+      if (p.x > 1100) { p.x = -20; p.y = Math.random() * 1920; }
+      if (p.y < -20) p.y = 1940;
+      if (p.y > 1940) p.y = -20;
+      pCtx.globalAlpha = p.opacity;
+      pCtx.fillStyle = 'rgba(255, 255, 255, 1)';
+      pCtx.beginPath();
+      pCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      pCtx.fill();
+    }
+    pCtx.globalAlpha = 1;
+  }
+  drawParticles();
+
+  // --- v2 effect: shimmering ring glow on the button + energy bolt finger→button ---
+  const beamCanvas = document.getElementById('beam-canvas');
+  const ctx = beamCanvas.getContext('2d');
+  // The internal buffer is 540×960; we keep all drawing code using the
+  // original 1080×1920 design coordinate space by scaling the context once
+  // at startup. The factor (1/2) maps design units → buffer pixels.
+  // (Persists across save/restore as long as we don't reset the transform.)
+  const BEAM_BASE_W = 540;
+  const BEAM_BASE_H = 960;
+  let beamResScale = 1 / 2;
+  function resetBeamTransform() {
+    ctx.setTransform(beamResScale, 0, 0, beamResScale, 0, 0);
+  }
+  resetBeamTransform();
+
+  // === HDR-style afterglow buffer (Tuts+ algorithm) ===
+  // Radial bolts and branches are drawn ONCE into this offscreen canvas at
+  // peak intensity. Every frame the buffer is multiplied by ~0.93 (alpha
+  // decay) so old strokes naturally fade out without the JS having to track
+  // per-bolt lifetimes. The buffer is then composited onto the main canvas.
+  // Big perf win: only NEW bolts are stroked each frame, not the trailing
+  // "ghosts" of dozens of past discharges.
+  const boltBuffer = document.createElement('canvas');
+  boltBuffer.width  = beamCanvas.width;   // 540
+  boltBuffer.height = beamCanvas.height;  // 960
+  const bctx = boltBuffer.getContext('2d');
+  function resetBoltBufferTransform() {
+    bctx.setTransform(beamResScale, 0, 0, beamResScale, 0, 0);
+  }
+  resetBoltBufferTransform();
+
+  function resizeBeamCanvases() {
+    const quality = clampNumber(debugSettings.canvasQuality, 25, 100) / 100;
+    const nextW = Math.max(1, Math.round(BEAM_BASE_W * quality));
+    const nextH = Math.max(1, Math.round(BEAM_BASE_H * quality));
+    if (beamCanvas.width !== nextW) beamCanvas.width = nextW;
+    if (beamCanvas.height !== nextH) beamCanvas.height = nextH;
+    if (boltBuffer.width !== nextW) boltBuffer.width = nextW;
+    if (boltBuffer.height !== nextH) boltBuffer.height = nextH;
+    beamResScale = nextW / DESIGN_W;
+    resetBeamTransform();
+    resetBoltBufferTransform();
+  }
+  resizeBeamCanvases();
+
+  function fadeBoltBuffer(amount) {
+    // amount = fraction of alpha removed each frame (0 = no fade, 1 = clear)
+    bctx.save();
+    bctx.setTransform(1, 0, 0, 1, 0, 0);   // raw pixel space
+    bctx.globalCompositeOperation = 'destination-out';
+    bctx.fillStyle = `rgba(0, 0, 0, ${amount})`;
+    bctx.fillRect(0, 0, boltBuffer.width, boltBuffer.height);
+    bctx.restore();
+  }
+  let isActive = false;
+  let beamProgress = 0;     // alpha / overall fade
+  let lengthProgress = 0;   // visible length fraction (0 = stub at button, 1 = reaches finger)
+  let time = 0;
+
+  // Button center (where the user presses by default)
+  const centerX = 540;
+  const centerY = 806;
+
+  // Live press point — follows the user's finger while held; falls back to button center.
+  let pressX = centerX;
+  let pressY = centerY;
+
+  // === Midpoint-displacement bolt generator ===
+  // Builds a jagged line from (x0,y0) to (x1,y1) by:
+  //   1. Picking N random positions along the source→dest line, then sorting.
+  //   2. Displacing each one perpendicular to the line by a random amount.
+  //   3. Smoothing each displacement toward its predecessor so neighbouring
+  //      points have correlated offsets — eliminates uglyzigzag joints and
+  //      gives a single continuous "bolt of plasma" look.
+  //   4. Damping displacement near both endpoints so the bolt actually
+  //      reaches the destination.
+  // Adapted from the Tuts+ / Catalin Zima 2D lightning algorithm.
+  // Returns { dx, dy } arrays of points relative to (x0,y0).
+  function midpointBoltPath(x0, y0, x1, y1, opts) {
+    opts = opts || {};
+    const dxL = x1 - x0;
+    const dyL = y1 - y0;
+    const lineLen = Math.hypot(dxL, dyL);
+    if (lineLen < 1) return { dx: [0], dy: [0] };
+    const nx = -dyL / lineLen;
+    const ny =  dxL / lineLen;
+
+    const numPoints = opts.points != null ? opts.points
+                    : Math.max(4, Math.round(lineLen / 32));
+    const sway      = opts.sway   != null ? opts.sway
+                    : Math.min(40, lineLen * 0.12);
+    const scale     = opts.scale  != null ? opts.scale : 0.55; // smoothing
+
+    // Random positions sorted ascending, with 0 and 1 as anchors
+    const positions = [0];
+    for (let i = 0; i < numPoints; i++) positions.push(Math.random());
+    positions.push(1);
+    positions.sort(function (a, b) { return a - b; });
+
+    const dxArr = new Array(positions.length);
+    const dyArr = new Array(positions.length);
+    let prevDisp = 0;
+    for (let i = 0; i < positions.length; i++) {
+      const pos = positions[i];
+      let disp = 0;
+      if (i > 0 && i < positions.length - 1) {
+        const raw = (Math.random() - 0.5) * 2 * sway;
+        // Smooth toward previous: disp = scale*raw + (1-scale)*prev
+        disp = scale * raw + (1 - scale) * prevDisp;
+        // Envelope: damp near endpoints so the bolt anchors at both ends
+        const env = Math.min(pos * 6, (1 - pos) * 6, 1);
+        disp *= env;
+      }
+      dxArr[i] = dxL * pos + nx * disp;
+      dyArr[i] = dyL * pos + ny * disp;
+      prevDisp = disp;
+    }
+    // Translate so that first point is (0,0) — caller anchors at pressX/pressY
+    return { dx: dxArr, dy: dyArr };
+  }
+
+  function spawnRadialBolt(opts) {
+    opts = opts || {};
+    const startAngle = opts.angle != null ? opts.angle : Math.random() * Math.PI * 2;
+    const targetLen  = opts.length != null ? opts.length : (140 + Math.random() * 220);  // 140–360px
+    const destX = Math.cos(startAngle) * targetLen;
+    const destY = Math.sin(startAngle) * targetLen;
+
+    // Main trunk via midpoint displacement (cleaner than a drunkard's walk)
+    const main = midpointBoltPath(0, 0, destX, destY, {
+      sway:  Math.min(45, targetLen * 0.13),
+      scale: 0.55,
+    });
+
+    // Sub-branches — at random points along the trunk, fork off another
+    // midpoint-displacement bolt that goes in a sharply different direction.
+    const subs = [];
+    const N = main.dx.length - 1;
+    for (let i = 1; i < N; i++) {
+      if (Math.random() < 0.45 * effectRate()) {
+        // Use the average direction at this point along the bolt
+        const tx = main.dx[i + 1] - main.dx[i - 1];
+        const ty = main.dy[i + 1] - main.dy[i - 1];
+        const baseDir = Math.atan2(ty, tx);
+        const sign = Math.random() < 0.5 ? -1 : 1;
+        const subDir = baseDir + sign * (Math.PI * 0.18 + Math.random() * Math.PI * 0.35);
+        // Sub-branch length: 25–60% of trunk length, smaller for branches deeper in
+        const subLen = Math.min(220, targetLen * (0.22 + Math.random() * 0.35));
+        const subDestX = main.dx[i] + Math.cos(subDir) * subLen;
+        const subDestY = main.dy[i] + Math.sin(subDir) * subLen;
+        const sub = midpointBoltPath(main.dx[i], main.dy[i], subDestX, subDestY, {
+          sway:  Math.min(28, subLen * 0.18),
+          scale: 0.55,
+        });
+        // Translate sub path to anchor at the fork point
+        for (let k = 0; k < sub.dx.length; k++) {
+          sub.dx[k] += main.dx[i];
+          sub.dy[k] += main.dy[i];
+        }
+        subs.push(sub);
+      }
+    }
+
+    // Draw the bolt directly into the offscreen afterglow buffer at full
+    // intensity — the buffer's per-frame alpha-decay handles the fade-out.
+    drawRadialBoltToBuffer(main, subs);
+  }
+
+  // Stroke a single bolt path (and its sub-branches) into the bolt buffer.
+  // baseW/tipW define the trunk's tapered widths; sub-branches are drawn thinner.
+  function drawRadialBoltToBuffer(main, subs) {
+    // Brighter, more saturated cyan-blue palette
+    const aHalo = glowAlpha(1.00 * beamProgress * boltFlicker);
+    const aCore = glowAlpha(1.00 * beamProgress * boltFlicker);
+    const HALO_COLOR = `rgba(100, 200, 255, ${aHalo})`;   // vivid cyan-blue
+    const CORE_COLOR = `rgba(225, 240, 255, ${aCore})`;   // bright near-white
+    const SHADOW_COL = `rgba(100, 180, 255, 1)`;
+
+    bctx.save();
+    bctx.globalCompositeOperation = 'lighter';
+    bctx.lineCap = 'round';
+    bctx.lineJoin = 'round';
+
+    function strokeOne(path, baseW, tipW, blur) {
+      const M = path.dx.length - 1;
+      if (M < 1) return;
+      // Halo
+      bctx.shadowColor = SHADOW_COL;
+      bctx.shadowBlur = debugSettings.shadowsEnabled ? blur : 0;
+      bctx.strokeStyle = HALO_COLOR;
+      for (let i2 = 0; i2 < M; i2++) {
+        const f = (i2 + 0.5) / M;
+        bctx.lineWidth = baseW + (tipW - baseW) * f;
+        bctx.beginPath();
+        bctx.moveTo(pressX + path.dx[i2],     pressY + path.dy[i2]);
+        bctx.lineTo(pressX + path.dx[i2 + 1], pressY + path.dy[i2 + 1]);
+        bctx.stroke();
+      }
+      // Core — slightly thicker proportion than before so it pops at the base
+      bctx.shadowBlur = 0;
+      bctx.strokeStyle = CORE_COLOR;
+      const baseC = baseW * 0.45;
+      const tipC  = tipW  * 0.40;
+      for (let i2 = 0; i2 < M; i2++) {
+        const f = (i2 + 0.5) / M;
+        bctx.lineWidth = baseC + (tipC - baseC) * f;
+        bctx.beginPath();
+        bctx.moveTo(pressX + path.dx[i2],     pressY + path.dy[i2]);
+        bctx.lineTo(pressX + path.dx[i2 + 1], pressY + path.dy[i2 + 1]);
+        bctx.stroke();
+      }
+    }
+
+    // Main trunk: 2× wider at the base (2.0→4.0), tip stays thin → strong taper.
+    // Slightly larger blur so the wider base blooms naturally.
+    strokeOne(main, 4.0, 0.40, Number(debugSettings.radialMainBlur));
+    if (subs && subs.length) {
+      // Sub-branches scaled up modestly to feel proportional to the main trunk
+      for (const s of subs) strokeOne(s, 1.6, 0.22, Number(debugSettings.radialBranchBlur));
+    }
+    bctx.restore();
+  }
+
+  // === Random arc fragments around the press point ===
+  // Pool of independently-living arcs that pop up at random angle/radius,
+  // ramp in, then fade out. Each one has its own lifetime so the result is
+  // organic crackle, not a rotating ring.
+  const ringFragments = [];
+  const RING_BAND_MIN = 26;   // closest radius to nucleus
+  const RING_BAND_MAX = 68;   // furthest radius
+
+  function spawnRingFragment() {
+    const r       = RING_BAND_MIN + Math.random() * (RING_BAND_MAX - RING_BAND_MIN);
+    const angle   = Math.random() * Math.PI * 2;
+    const span    = 0.25 + Math.random() * 0.85;   // 0.25–1.1 rad — short fragments
+    const life    = 0.24 + Math.random() * 0.40;   // 240–640ms, fewer slower fragments
+    const seed    = Math.random() * 1000;
+    // Color: ~70% blue, ~30% violet
+    const tone    = Math.random() < 0.7 ? 'blue' : 'violet';
+    ringFragments.push({ r, angle, span, age: 0, life, seed, tone });
+  }
+
+  let lastFragmentSpawnTime = 0;
+  function tickRingFragments() {
+    if (!isActive || lengthProgress < 0.3) return;
+    const rate = effectRate();
+    if (rate <= 0) return;
+    // Throttled spawn — random interval so pops aren't periodic
+    const minGap = (0.12 + Math.random() * 0.12) / rate;   // 120–240ms at default
+    if (time - lastFragmentSpawnTime >= minGap && ringFragments.length < debugSettings.maxRingFragments) {
+      spawnRingFragment();
+      lastFragmentSpawnTime = time;
+    }
+  }
+
+  function drawRingFragments() {
+    if (ringFragments.length === 0) return;
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    for (let i = ringFragments.length - 1; i >= 0; i--) {
+      const f = ringFragments[i];
+      f.age += PLASMA_TIME_STEP;
+      if (f.age >= f.life) { ringFragments.splice(i, 1); continue; }
+      // Brightness envelope: ramp up first 25%, fade out the rest
+      const t = f.age / f.life;
+      const env = t < 0.25 ? (t / 0.25) : (1 - (t - 0.25) / 0.75);
+      if (env <= 0.02) continue;
+
+      // Build jagged arc geometry
+      const segs = 5;
+      const pts = new Array(segs + 1);
+      for (let s = 0; s <= segs; s++) {
+        const u   = s / segs;
+        const ang = f.angle + f.span * u;
+        // Per-segment radius jitter (uses seed to stay stable across the fragment's life)
+        const seedR = Math.sin(f.seed * 91.3 + s * 5.3) * 17593.1;
+        const jr    = (seedR - Math.floor(seedR) - 0.5) * 14;
+        const r     = f.r + jr;
+        pts[s] = {
+          x: pressX + Math.cos(ang) * r,
+          y: pressY + Math.sin(ang) * r,
+        };
+      }
+
+      // Tone-based palette
+      const isViolet = f.tone === 'violet';
+      const baseRGB  = isViolet ? '180, 145, 240' : '150, 195, 255';
+      const coreRGB  = isViolet ? '220, 200, 250' : '220, 235, 255';
+      const shadowRGB = isViolet ? '180, 140, 240' : '140, 180, 255';
+      const a = nucA_ * env;
+
+      // Halo
+      ctx.shadowColor = `rgba(${shadowRGB}, 0.95)`;
+      ctx.shadowBlur = shadowValue('arcFragmentBlur');
+      ctx.strokeStyle = `rgba(${baseRGB}, ${a})`;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let s = 1; s <= segs; s++) ctx.lineTo(pts[s].x, pts[s].y);
+      ctx.stroke();
+      // Core
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = `rgba(${coreRGB}, ${a * 0.85})`;
+      ctx.lineWidth = 0.4;
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let s = 1; s <= segs; s++) ctx.lineTo(pts[s].x, pts[s].y);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  // Module-scope holder for the nucleus alpha so the fragment renderer can use it.
+  // Set inside the nucleus block right before it calls drawRingFragments().
+  let nucA_ = 1;
+
+  // === Thin glowing rotating ring with smooth gaps ===
+  // Drawn as a series of short arc segments around a fixed radius. Brightness
+  // along the circumference is modulated by a slow sin wave so the ring shows
+  // 2-3 brighter zones with smooth fades to invisible between them. Colour
+  // also cycles around the circle (blue ↔ violet). The whole pattern rotates
+  // slowly via a phase offset.
+  const RING_R = 39;                 // radius of the contour ring (half of original 78)
+
+  // v3 perf: pre-render the entire ring (64 segments × 2 strokes each = 128
+  // shadowBlur'd strokes) ONCE into an offscreen canvas. Per frame we just
+  // translate + rotate + drawImage — replaces 128 stroke calls with a single
+  // GPU-accelerated image blit.
+  // Cost per frame goes from O(SEGS × shadowBlur) to O(1) blit.
+  const RING_PAD = 28;                                    // pixels for the glow halo
+  const RING_SPRITE = (RING_R + RING_PAD) * 2;            // 134 px square
+  let ringSprite = null;
+  function buildRingSprite() {
+    const c = document.createElement('canvas');
+    c.width = c.height = RING_SPRITE;
+    const r = c.getContext('2d');
+    const cx = RING_SPRITE / 2;
+    const cy = RING_SPRITE / 2;
+    r.globalCompositeOperation = 'lighter';
+    r.lineCap = 'round';
+    const SEGS = 64;
+    const TWO_PI = Math.PI * 2;
+    for (let i = 0; i < SEGS; i++) {
+      const t1 = i / SEGS;
+      const a1 = t1 * TWO_PI;
+      const a2 = ((i + 1) / SEGS) * TWO_PI;
+      // Same brightness curve (2.5 bumps) and colour cycle as before, baked
+      // at colorPhase=0 (drifting colour cycle is sacrificed; brightness
+      // pattern still rotates because we rotate the whole sprite).
+      const w = Math.pow(Math.max(0, 0.5 + 0.5 * Math.sin(t1 * TWO_PI * 2.5)), 1.6);
+      if (w < 0.04) continue;
+      const mix = 0.5 + 0.5 * Math.sin(t1 * TWO_PI);
+      const rR = Math.round(150 + (180 - 150) * mix);
+      const rG = Math.round(195 + (145 - 195) * mix);
+      const rB = Math.round(255 + (240 - 255) * mix);
+      // alpha is baked at "full strength" — runtime nucA is applied via
+      // ctx.globalAlpha during the blit.
+      const a = w * 0.275;
+      r.shadowColor = `rgba(${rR}, ${rG}, ${rB}, 0.95)`;
+      r.shadowBlur = shadowValue('ringSpriteBlur');
+      r.strokeStyle = `rgba(${rR}, ${rG}, ${rB}, ${a})`;
+      r.lineWidth = 1.8;
+      r.beginPath();
+      r.arc(cx, cy, RING_R, a1, a2);
+      r.stroke();
+      r.shadowBlur = 0;
+      r.strokeStyle = `rgba(230, 235, 255, ${a * 0.42})`;
+      r.lineWidth = 0.5;
+      r.beginPath();
+      r.arc(cx, cy, RING_R, a1, a2);
+      r.stroke();
+    }
+    return c;
+  }
+
+  function rebuildRingSprite() {
+    ringSprite = buildRingSprite();
+  }
+  rebuildRingSprite();
+
+  function drawGlowRing(time, nucA) {
+    const rotPhase = time * 0.35;        // ~18s per full revolution
+    ctx.save();
+    ctx.translate(pressX, pressY);
+    ctx.rotate(rotPhase);
+    ctx.globalAlpha = nucA;
+    ctx.drawImage(ringSprite, -RING_SPRITE / 2, -RING_SPRITE / 2);
+    ctx.restore();
+  }
+
+  // === Fast random "runners" travelling along the ring ===
+  // Independent dots with their own direction (cw or ccw), speed, color and
+  // life. Spawn rate is throttled so they appear sporadically.
+  const ringRunners = [];
+  let lastRunnerSpawnTime = 0;
+  function spawnRingRunner() {
+    ringRunners.push({
+      angle: Math.random() * Math.PI * 2,
+      dir:   Math.random() < 0.5 ? 1 : -1,
+      speed: 1.2 + Math.random() * 2.0,        // 1.2–3.2 rad/sec
+      age:   0,
+      life:  0.40 + Math.random() * 0.50,      // 400–900ms
+      color: Math.random() < 0.55 ? 'blue' : 'violet',
+    });
+  }
+  function tickRingRunners(time) {
+    if (!isActive || lengthProgress < 0.3) return;
+    const rate = effectRate();
+    if (rate <= 0) return;
+    const minGap = (0.60 + Math.random() * 0.80) / rate;  // 600–1400ms at default
+    if (time - lastRunnerSpawnTime >= minGap && ringRunners.length < 2) {
+      spawnRingRunner();
+      lastRunnerSpawnTime = time;
+    }
+  }
+  function drawRingRunners(nucA) {
+    if (ringRunners.length === 0) return;
+    ctx.save();
+    ctx.lineCap = 'round';
+    for (let i = ringRunners.length - 1; i >= 0; i--) {
+      const r = ringRunners[i];
+      r.age += PLASMA_TIME_STEP;
+      if (r.age >= r.life) { ringRunners.splice(i, 1); continue; }
+      r.angle += r.dir * r.speed * PLASMA_TIME_STEP;
+
+      // Brightness envelope — fade in 15%, fade out the rest
+      const t = r.age / r.life;
+      const env = t < 0.15 ? t / 0.15 : 1 - (t - 0.15) / 0.85;
+      if (env <= 0.02) continue;
+
+      // Render as a short arc segment ON the ring contour, not a free-floating
+      // dot. The arc is centred on the runner's current angle and spans a
+      // small angular range so it reads as a brief streak following the circle.
+      const span   = 0.20;                          // ~11° of arc
+      const startA = r.angle - span * 0.5;
+      const endA   = r.angle + span * 0.5;
+      const colorRGB  = r.color === 'violet' ? '180, 145, 240' : '150, 195, 255';
+      const shadowRGB = r.color === 'violet' ? '180, 140, 240' : '140, 180, 255';
+
+      // Wide soft halo
+      ctx.shadowColor = `rgba(${shadowRGB}, 0.95)`;
+      ctx.shadowBlur = shadowValue('ringRunnerBlur');
+      ctx.strokeStyle = `rgba(${colorRGB}, ${env * 0.85 * nucA})`;
+      ctx.lineWidth = 2.0;
+      ctx.beginPath();
+      ctx.arc(pressX, pressY, RING_R, startA, endA);
+      ctx.stroke();
+      // Crisp bright core on top
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = `rgba(245, 250, 255, ${env * 0.95 * nucA})`;
+      ctx.lineWidth = 0.7;
+      ctx.beginPath();
+      ctx.arc(pressX, pressY, RING_R, startA, endA);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // Fingertip position of the Rive hand (above the button) — adjust if hand moves
+  const tipX = 540;
+  const tipY = 670;   // raised 65px to follow the hand (-280 → -345)
+
+  // === Bright random flashes at the press point — replaces the steady halo ===
+  // Each flash is a quick pulse: rises in ~50ms, fades in ~150–300ms, varied size.
+  const centerFlashes = [];
+  function spawnCenterFlash() {
+    centerFlashes.push({
+      age: 0,
+      life: 0.15 + Math.random() * 0.20,    // 150–350ms
+      maxR: 22 + Math.random() * 10,        // 22–32px
+      intensity: 0.55 + Math.random() * 0.45,
+    });
+  }
+
+  // === Pulses of light that travel up the bolt from the flash point ===
+  // Each pulse is born together with a center flash and travels button → finger,
+  // rendering as a small bright glow at its current position along the bolt.
+  const boltPulses = [];
+  function spawnBoltPulse() {
+    boltPulses.push({
+      age: 0,
+      duration: 0.45 + Math.random() * 0.30,  // 450–750ms travel time
+      intensity: 0.75 + Math.random() * 0.25,
+      radius:    9 + Math.random() * 6,       // 9–15px glow
+    });
+  }
+
+  // === Short electric branches that sprout from the bolt and retract back ===
+  // Branches anchor to a random point on the main bolt, fork outward, and are
+  // drawn ONCE into the afterglow buffer (which then handles the fade-out).
+  let lastBranchSpawnTime = 0; // throttle so spawns are spread out in time
+
+  function spawnBoltBranch(boltPath, segCount) {
+    if (!boltPath || boltPath.length < 2) return;
+    // Pick an anchor point along the visible bolt
+    const anchorT = 0.1 + Math.random() * 0.8;
+    const fIdx = Math.min(segCount - 1, Math.floor(anchorT * segCount));
+    const fFrac = anchorT * segCount - fIdx;
+    const a1 = boltPath[fIdx];
+    const a2 = boltPath[fIdx + 1];
+    const ax = a1.x + (a2.x - a1.x) * fFrac;
+    const ay = a1.y + (a2.y - a1.y) * fFrac;
+
+    // Direction: perpendicular to the local bolt tangent + random jitter
+    const tdx = a2.x - a1.x;
+    const tdy = a2.y - a1.y;
+    const tlen = Math.hypot(tdx, tdy) || 1;
+    const side = Math.random() < 0.5 ? 1 : -1;
+    const baseDir = Math.atan2(tdy, tdx) + side * Math.PI * 0.5;
+    const angleOff = (Math.random() - 0.5) * 0.9;
+    const dir = baseDir + angleOff;
+
+    // Length of the branch
+    const len = 30 + Math.random() * 95;   // 30–125px
+    const dx = Math.cos(dir) * len;
+    const dy = Math.sin(dir) * len;
+
+    // Build branch via midpoint displacement (consistent with radial bolts)
+    const path = midpointBoltPath(0, 0, dx, dy, {
+      sway:  Math.min(12, len * 0.15),
+      scale: 0.55,
+    });
+
+    // Draw immediately into the afterglow buffer at the anchor point
+    drawBranchToBuffer(path, ax, ay);
+  }
+
+  function drawBranchToBuffer(path, ax, ay) {
+    const aHalo = glowAlpha(0.85 * beamProgress * boltFlicker);
+    const aCore = glowAlpha(beamProgress * boltFlicker);
+    const haloStyle = `rgba(180, 215, 255, ${aHalo})`;
+    const coreStyle = `rgba(225, 240, 255, ${aCore})`;
+    bctx.save();
+    bctx.globalCompositeOperation = 'lighter';
+    bctx.lineCap = 'round';
+    bctx.lineJoin = 'round';
+
+    const N = path.dx.length - 1;
+    if (N < 1) { bctx.restore(); return; }
+    // Halo
+    bctx.shadowColor = 'rgba(170, 215, 255, 0.95)';
+    bctx.shadowBlur = shadowValue('sideBranchBlur');
+    bctx.strokeStyle = haloStyle;
+    for (let i = 0; i < N; i++) {
+      const f = (i + 0.5) / N;
+      bctx.lineWidth = 1.8 + (0.30 - 1.8) * f;
+      bctx.beginPath();
+      bctx.moveTo(ax + path.dx[i],     ay + path.dy[i]);
+      bctx.lineTo(ax + path.dx[i + 1], ay + path.dy[i + 1]);
+      bctx.stroke();
+    }
+    // Core
+    bctx.shadowBlur = 0;
+    bctx.strokeStyle = coreStyle;
+    for (let i = 0; i < N; i++) {
+      const f = (i + 0.5) / N;
+      bctx.lineWidth = 0.70 + (0.12 - 0.70) * f;
+      bctx.beginPath();
+      bctx.moveTo(ax + path.dx[i],     ay + path.dy[i]);
+      bctx.lineTo(ax + path.dx[i + 1], ay + path.dy[i + 1]);
+      bctx.stroke();
+    }
+    bctx.restore();
+  }
+
+  // === Discrete jitter bolt: not a flowing wave, but a series of sharp snapshots.
+  // The perpendicular offset for each segment is regenerated every ~140–240ms,
+  // so the bolt visibly "snaps" to a new shape — like real lightning re-striking.
+  // Segment count scales with bolt length so longer bolts get proportionally more
+  // kinks (a stretched bolt doesn't degenerate into a near-straight line).
+  const BOLT_BASE_PX_PER_SEG = 28;    // v6 perf: was 18px; fewer segments = fewer strokes
+  const BOLT_MIN_SEGS = 6;
+  const BOLT_MAX_SEGS = 42;
+  let boltOffsets = null;        // cached perpendicular offsets per segment
+  let boltNextRegen = 0;         // time (in our `time` units) of next regen
+  let boltFlicker = 1.0;         // brightness multiplier for current snapshot
+
+  function currentBoltSegCount() {
+    const dx = pressX - tipX;
+    const dy = pressY - tipY;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    const segmentLevel = clampNumber(debugSettings.boltSegments, 0, 20);
+    if (segmentLevel <= 0) return 2;
+    const pxPerSegment = BOLT_BASE_PX_PER_SEG * (DEBUG_DEFAULTS.boltSegments / segmentLevel);
+    return Math.max(BOLT_MIN_SEGS,
+           Math.min(BOLT_MAX_SEGS, Math.round(len / pxPerSegment)));
+  }
+
+  function regenerateBoltOffsets() {
+    const segs = currentBoltSegCount();
+    const offsets = new Array(segs + 1);
+    for (let i = 0; i <= segs; i++) {
+      const f = i / segs;
+      // Envelope: zero at endpoints (anchor stays at finger & press point)
+      const env = Math.sin(f * Math.PI);
+      const r = (Math.random() - 0.5) * 2;          // -1..1
+      offsets[i] = r * 5 * env;
+    }
+    boltOffsets = offsets;
+
+    // Roll a new brightness for this snapshot:
+    //   ~10% chance — dim dip (the bolt almost vanishes for a moment)
+    //   ~15% chance — extra-bright restrike
+    //   else        — normal brightness with mild variation
+    const roll = Math.random();
+    if (roll < 0.10) {
+      boltFlicker = 0.20 + Math.random() * 0.20;       // 0.20–0.40 (dark frame)
+    } else if (roll < 0.25) {
+      boltFlicker = 1.10 + Math.random() * 0.20;       // 1.10–1.30 (bright restrike)
+    } else {
+      boltFlicker = 0.75 + Math.random() * 0.25;       // 0.75–1.00 (normal)
+    }
+  }
+
+  // Keep only the last `frac` (by arc-length) of the path, anchored at the button end.
+  // pts[0] = finger end, pts[N] = button end. Growth/retract happens at the finger end.
+  function clipPathToProgress(pts, frac) {
+    if (frac >= 1) return pts;
+    if (frac <= 0) return [pts[pts.length - 1]];
+    const N = pts.length - 1;
+    let total = 0;
+    const segLens = new Array(N);
+    for (let i = 0; i < N; i++) {
+      const dx = pts[i + 1].x - pts[i].x;
+      const dy = pts[i + 1].y - pts[i].y;
+      segLens[i] = Math.sqrt(dx * dx + dy * dy);
+      total += segLens[i];
+    }
+    const targetLen = total * frac;
+    let acc = 0;
+    const result = [pts[N]];
+    // Walk backward from button toward finger, accumulating until we reach targetLen
+    for (let i = N - 1; i >= 0; i--) {
+      const segLen = segLens[i];
+      if (acc + segLen >= targetLen) {
+        const t = (targetLen - acc) / segLen;
+        result.unshift({
+          x: pts[i + 1].x + (pts[i].x - pts[i + 1].x) * t,
+          y: pts[i + 1].y + (pts[i].y - pts[i + 1].y) * t,
+        });
+        return result;
+      }
+      result.unshift(pts[i]);
+      acc += segLen;
+    }
+    return result;
+  }
+
+  function buildPathFromOffsets(offsetArr) {
+    const dx = pressX - tipX;
+    const dy = pressY - tipY;
+    const angle = Math.atan2(dy, dx);
+    const perpX = -Math.sin(angle);
+    const perpY = Math.cos(angle);
+    const segs = offsetArr.length - 1;
+    const pts = new Array(segs + 1);
+    for (let i = 0; i <= segs; i++) {
+      const f = i / segs;
+      const baseX = tipX + dx * f;
+      const baseY = tipY + dy * f;
+      const off = offsetArr[i];
+      pts[i] = {
+        x: baseX + perpX * off,
+        y: baseY + perpY * off,
+      };
+    }
+    return pts;
+  }
+
+  function buildBoltPath(t) {
+    if (!boltOffsets || t >= boltNextRegen) {
+      regenerateBoltOffsets();
+      boltNextRegen = t + 0.14 + Math.random() * 0.10; // 140–240ms hold
+    }
+    return buildPathFromOffsets(boltOffsets);
+  }
+
+  function strokePath(pts, lineWidth, style) {
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) {
+      ctx.lineTo(pts[i].x, pts[i].y);
+    }
+    ctx.strokeStyle = style;
+    ctx.lineWidth = lineWidth;
+    ctx.stroke();
+  }
+
+  let PLASMA_FRAME_MS = 1000 / debugSettings.plasmaFps;
+  let PLASMA_TIME_STEP = 1 / debugSettings.plasmaFps;
+  let lastPlasmaFrame = 0;
+  let beamCanvasIdleCleared = false;
+
+  applyDebugSettings = function () {
+    debugSettings.canvasQuality = clampNumber(debugSettings.canvasQuality, 25, 100);
+    debugSettings.plasmaFps = clampNumber(debugSettings.plasmaFps, 10, 60);
+    debugSettings.dischargeRate = clampNumber(debugSettings.dischargeRate, 0, 20);
+    debugSettings.boltSegments = clampNumber(debugSettings.boltSegments, 0, 20);
+    debugSettings.maxRingFragments = clampNumber(debugSettings.maxRingFragments, 0, 12);
+    debugSettings.particleCount = clampNumber(debugSettings.particleCount, 0, 60);
+    debugSettings.particleFps = clampNumber(debugSettings.particleFps, 1, 60);
+    debugSettings.glowIntensity = clampNumber(debugSettings.glowIntensity, 0, 150);
+
+    [
+      'mainGlowBlur',
+      'midGlowBlur',
+      'radialMainBlur',
+      'radialBranchBlur',
+      'sideBranchBlur',
+      'arcFragmentBlur',
+      'ringRunnerBlur',
+      'ringSpriteBlur',
+    ].forEach((key) => {
+      debugSettings[key] = clampNumber(debugSettings[key], 0, 25);
+    });
+
+    PLASMA_FRAME_MS = 1000 / debugSettings.plasmaFps;
+    PLASMA_TIME_STEP = 1 / debugSettings.plasmaFps;
+    resizeBeamCanvases();
+    applyParticleSettings();
+    updateSkyFlashBlur();
+    rebuildRingSprite();
+    boltNextRegen = 0;
+    beamCanvasIdleCleared = false;
+  };
+  applyDebugSettings();
+  syncDebugControls();
+
+  function drawPlasma(now = performance.now()) {
+    requestAnimationFrame(drawPlasma);
+    if (now - lastPlasmaFrame < PLASMA_FRAME_MS) return;
+    const elapsedMs = debugStats.lastDrawTime ? now - debugStats.lastDrawTime : PLASMA_FRAME_MS;
+    debugStats.lastDrawTime = now;
+    debugStats.fps = debugStats.fps ? debugStats.fps * 0.85 + (1000 / elapsedMs) * 0.15 : 1000 / elapsedMs;
+    debugStats.frameMs = debugStats.frameMs ? debugStats.frameMs * 0.85 + elapsedMs * 0.15 : elapsedMs;
+    lastPlasmaFrame = now;
+    time += PLASMA_TIME_STEP;
+
+    const target = isActive ? 1 : 0;
+    // Alpha fades in/out with the bolt
+    beamProgress += (target - beamProgress) * (isActive ? 8 : 5) * PLASMA_TIME_STEP;
+    if (Math.abs(beamProgress - target) < 0.001) beamProgress = target;
+    // Length grows from button → finger when pressed, retracts back when released.
+    // Faster on press (~250ms), a touch slower on release (~400ms).
+    lengthProgress += (target - lengthProgress) * (isActive ? 4.5 : 9) * PLASMA_TIME_STEP;
+    if (Math.abs(lengthProgress - target) < 0.001) lengthProgress = target;
+
+    const liveLightningCount =
+      centerFlashes.length +
+      boltPulses.length +
+      ringFragments.length +
+      ringRunners.length +
+      ((beamProgress >= 0.02 || lengthProgress >= 0.02) ? 1 : 0);
+    debugStats.activeFx = liveLightningCount + particles.length;
+
+    if (!isActive && liveLightningCount === 0) {
+      if (!beamCanvasIdleCleared) {
+        ctx.clearRect(0, 0, DESIGN_W, DESIGN_H);
+        bctx.save();
+        bctx.setTransform(1, 0, 0, 1, 0, 0);
+        bctx.clearRect(0, 0, boltBuffer.width, boltBuffer.height);
+        bctx.restore();
+        beamCanvasIdleCleared = true;
+      }
+      updateDebugMetrics(now);
+      return;
+    }
+
+    beamCanvasIdleCleared = false;
+
+    ctx.clearRect(0, 0, 1080, 1920);
+
+    // Decay the afterglow buffer (radial bolts + branches live here). Higher
+    // fade = faster decay = less "imprint" of past discharges accumulating on
+    // the canvas. 0.18 ≈ ~400ms full fade — bright enough to register as a
+    // discharge, fast enough to not leave a visible ghost-trail.
+    fadeBoltBuffer(0.18);
+
+    if (beamProgress < 0.02 && lengthProgress < 0.02) {
+      // Even when there's nothing to draw on the live canvas, blit any
+      // remaining afterglow so it can fade out cleanly post-release.
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.drawImage(boltBuffer, 0, 0);
+      ctx.restore();
+      updateDebugMetrics(now);
+      return;
+    }
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+
+    // ===== 1. RANDOM BRIGHT FLASHES at the press point =====
+    // Spawn rate ramps with the bolt's length progress so flashes start soft on press
+    // and fade as the bolt retracts.
+    if (isActive && lengthProgress > 0.3 && Math.random() < 0.03 * effectRate() * lengthProgress) {
+      spawnCenterFlash();
+      spawnBoltPulse();
+    }
+    for (let i = centerFlashes.length - 1; i >= 0; i--) {
+      const f = centerFlashes[i];
+      f.age += PLASMA_TIME_STEP;
+      if (f.age >= f.life) { centerFlashes.splice(i, 1); continue; }
+      const tt = f.age / f.life;
+      const a = tt < 0.15 ? tt / 0.15 : 1 - (tt - 0.15) / 0.85;
+      const r = f.maxR * (0.35 + tt * 0.65);
+      const aa = glowAlpha(f.intensity * a * beamProgress);
+      const g = ctx.createRadialGradient(pressX, pressY, 0, pressX, pressY, r);
+      g.addColorStop(0,    `rgba(255, 255, 255, ${aa})`);
+      g.addColorStop(0.35, `rgba(200, 230, 255, ${aa * 0.55})`);
+      g.addColorStop(1,    `rgba(140, 190, 255, 0)`);
+      ctx.fillStyle = g;
+      ctx.fillRect(pressX - r, pressY - r, r * 2, r * 2);
+    }
+
+    // ===== Build the bolt path: finger → press point, then clip by lengthProgress =====
+    const fullBolt = buildBoltPath(time);
+    const bolt = clipPathToProgress(fullBolt, lengthProgress);
+    const boltSeg = bolt.length - 1;
+
+    // ===== 2. ENERGY BOLT from finger → button (path already built above) =====
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // Per-snapshot brightness — natural electric flicker
+    const flick = boltFlicker;
+
+    // ===== Bolt rendering — v3: 3 layered strokes (was 8) =====
+    // Old stack:  ambient glow (×2) + ghost (×2) + outer halo + mid + core = 7-8 strokes
+    // New stack:  one wide glow + mid + crisp core = 3 strokes.
+    // Ghost channel is removed entirely — barely noticed, cost was high.
+
+    // 1. Outer glow — wide halo with heavy blur (covers former ambient + outer halo)
+    ctx.shadowColor = 'rgba(150, 195, 255, 0.95)';
+    ctx.shadowBlur = shadowValue('mainGlowBlur');
+    strokePath(bolt, 3.0, `rgba(150, 195, 255, ${glowAlpha(0.50 * beamProgress * flick)})`);
+
+    // 2. Mid blue glow
+    ctx.shadowColor = 'rgba(180, 220, 255, 0.85)';
+    ctx.shadowBlur = shadowValue('midGlowBlur');
+    strokePath(bolt, 1.2, `rgba(190, 225, 255, ${glowAlpha(0.65 * beamProgress * flick)})`);
+
+    // 3. Hot white core — hairline, crisp and contrasting
+    ctx.shadowBlur = 0;
+    strokePath(bolt, 0.6, `rgba(255, 255, 255, ${glowAlpha(beamProgress * flick)})`);
+
+    // ===== 2c. BOLT PULSES — light that travels up the bolt from each press flash =====
+    if (bolt.length > 1) {
+      const pSegs = bolt.length - 1;
+      for (let i = boltPulses.length - 1; i >= 0; i--) {
+        const p = boltPulses[i];
+        p.age += PLASMA_TIME_STEP;
+        if (p.age >= p.duration) { boltPulses.splice(i, 1); continue; }
+        const tt = p.age / p.duration;
+        // Travel from button (t=1) to finger (t=0)
+        const pos = 1 - tt;
+        const idx = Math.min(Math.floor(pos * pSegs), pSegs - 1);
+        const frac = pos * pSegs - idx;
+        const a = bolt[idx];
+        const b = bolt[idx + 1];
+        const px = a.x + (b.x - a.x) * frac;
+        const py = a.y + (b.y - a.y) * frac;
+
+        // Brightness: stays mostly bright, only mild fade so it survives all the way up
+        const alpha = glowAlpha((1 - tt * 0.25) * p.intensity * beamProgress);
+        const r = p.radius;
+        const g = ctx.createRadialGradient(px, py, 0, px, py, r);
+        g.addColorStop(0,    `rgba(255, 255, 255, ${alpha})`);
+        g.addColorStop(0.4,  `rgba(200, 230, 255, ${alpha * 0.5})`);
+        g.addColorStop(1,    `rgba(140, 190, 255, 0)`);
+        ctx.fillStyle = g;
+        ctx.fillRect(px - r, py - r, r * 2, r * 2);
+      }
+    }
+
+    // ===== 2b. SHORT ELECTRIC BRANCHES — sprout from the bolt and retract =====
+    // Only spawn when the bolt is fully extended; existing branches finish their
+    // life naturally during retract (their anchors slide along the visible bolt).
+    // Branches now go straight into the afterglow buffer — fade is handled by
+    // the per-frame buffer decay, not a per-branch lifecycle. Throttle by min
+    // time between spawns (180ms) so they're spread out instead of bursting.
+    if (
+      isActive &&
+      lengthProgress > 0.95 &&
+      bolt.length > 1 &&
+      time - lastBranchSpawnTime >= 0.18 &&
+      Math.random() < 0.05 * effectRate()
+    ) {
+      spawnBoltBranch(bolt, boltSeg);
+      lastBranchSpawnTime = time;
+    }
+
+
+    // ===== POWERFUL DISCHARGE — chaotic radial bolts (drawn into afterglow buffer) =====
+    if (isActive && lengthProgress > 0.5 && Math.random() < 0.25 * effectRate()) {
+      spawnRadialBolt();
+    }
+
+    // Composite the afterglow buffer (radial bolts + branches) under the live nucleus
+    {
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.drawImage(boltBuffer, 0, 0);
+      ctx.restore();
+    }
+
+    // ===== NUCLEUS — cool halo (white→cyan→blue→violet) + random arc fragments =====
+    if (isActive && lengthProgress > 0.1) {
+      const breath = 0.88 + Math.sin(time * 1.6) * 0.12;
+      const innerR = 36 * breath;
+      const nucR   = 130 * breath;          // larger so the violet tail spreads further
+      const nucA   = glowAlpha(beamProgress * (0.85 + boltFlicker * 0.15));
+
+      // Outer halo — white → cyan → blue → violet → fade. Many stops in the
+      // tail so violet doesn't terminate in a visible ring.
+      const g1 = ctx.createRadialGradient(pressX, pressY, 0, pressX, pressY, nucR);
+      g1.addColorStop(0.00, `rgba(220, 235, 255, ${0.32 * nucA})`);  // soft white-cyan continuing core
+      g1.addColorStop(0.20, `rgba(170, 215, 255, ${0.24 * nucA})`);  // cyan
+      g1.addColorStop(0.38, `rgba(150, 185, 250, ${0.20 * nucA})`);  // mid blue
+      g1.addColorStop(0.52, `rgba(170, 150, 240, ${0.17 * nucA})`);  // blue → violet bridge
+      g1.addColorStop(0.62, `rgba(180, 130, 240, ${0.14 * nucA})`);  // violet peak
+      g1.addColorStop(0.72, `rgba(170, 115, 235, ${0.095 * nucA})`);
+      g1.addColorStop(0.81, `rgba(160, 100, 230, ${0.060 * nucA})`);
+      g1.addColorStop(0.88, `rgba(150,  90, 225, ${0.035 * nucA})`);
+      g1.addColorStop(0.94, `rgba(140,  78, 220, ${0.018 * nucA})`);
+      g1.addColorStop(0.98, `rgba(135,  70, 215, ${0.006 * nucA})`);
+      g1.addColorStop(1.00, `rgba(130,  65, 210, 0)`);
+      ctx.fillStyle = g1;
+      ctx.fillRect(pressX - nucR, pressY - nucR, nucR * 2, nucR * 2);
+
+      // Tight bright nucleus — light cyan-blue at the centre, fading through
+      // a blue→violet bridge so it blends with the violet halo around it.
+      const g2 = ctx.createRadialGradient(pressX, pressY, 0, pressX, pressY, innerR);
+      g2.addColorStop(0.00, `rgba(195, 225, 255, ${0.98 * nucA})`);  // bright light cyan-blue
+      g2.addColorStop(0.30, `rgba(170, 200, 255, ${0.70 * nucA})`);  // mid blue
+      g2.addColorStop(0.65, `rgba(180, 160, 245, ${0.40 * nucA})`);  // blue → violet
+      g2.addColorStop(1.00, `rgba(180, 130, 240, 0)`);               // violet, transparent
+      ctx.fillStyle = g2;
+      ctx.fillRect(pressX - innerR, pressY - innerR, innerR * 2, innerR * 2);
+
+      // === Random arc FRAGMENTS around the press point ===
+      nucA_ = nucA;          // share with the fragment renderer
+      tickRingFragments();
+      drawRingFragments();
+
+      // === Thin glowing rotating ring with smooth gaps ===
+      // Drawn on top of fragments — gives the press point a constant "halo
+      // contour" element with breathing brightness around its circumference.
+      drawGlowRing(time, nucA);
+
+      // === Random fast runners along the ring ===
+      tickRingRunners(time);
+      drawRingRunners(nucA);
+    }
+
+    ctx.lineCap = 'butt';
+    ctx.lineJoin = 'miter';
+    ctx.shadowBlur = 0;
+
+    ctx.restore();
+    updateDebugMetrics(now);
+  }
+  drawPlasma();
+
+  // --- Handle resize ---
+  window.addEventListener('resize', () => {
+    if (riveInstance) sizeHandCanvas();
+  });
+
+})();
+</script>
+
+</body>
+</html>

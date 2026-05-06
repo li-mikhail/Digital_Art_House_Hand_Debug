@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Display Remote — Touch to Create</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    height: 100%;
+    background: #0d0f12;
+    color: #e6eaf0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .panel {
+    width: 100%;
+    max-width: 420px;
+    background: #161a20;
+    border: 1px solid #262c34;
+    border-radius: 16px;
+    padding: 24px;
+  }
+  h1 {
+    font-size: 18px;
+    font-weight: 500;
+    margin-bottom: 4px;
+    letter-spacing: 0.3px;
+  }
+  .sub {
+    font-size: 13px;
+    color: #8a93a0;
+    margin-bottom: 24px;
+  }
+  .label {
+    font-size: 12px;
+    color: #8a93a0;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin: 18px 0 10px;
+  }
+  .row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+  button.rot {
+    appearance: none;
+    border: 1px solid #2c333d;
+    background: #1d2229;
+    color: #e6eaf0;
+    padding: 16px 0;
+    border-radius: 10px;
+    font: inherit;
+    font-size: 15px;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.05s ease;
+  }
+  button.rot:hover { background: #232932; border-color: #3a414c; }
+  button.rot:active { transform: scale(0.97); }
+  button.rot.active {
+    background: #2563eb;
+    border-color: #2563eb;
+    color: white;
+  }
+  .status {
+    margin-top: 22px;
+    padding: 12px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1.5;
+    background: #1a1f26;
+    border: 1px solid #232932;
+    color: #8a93a0;
+  }
+  .status.ok    { border-color: #14532d; color: #86efac; }
+  .status.err   { border-color: #5a1d1d; color: #fca5a5; }
+  .status.busy  { border-color: #2c2a18; color: #facc15; }
+  .footer {
+    margin-top: 18px;
+    font-size: 11px;
+    color: #5a6470;
+    text-align: center;
+    line-height: 1.6;
+  }
+  .footer code {
+    background: #1d2229;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+  }
+</style>
+</head>
+<body>
+  <div class="panel">
+    <h1>Display Remote</h1>
+    <div class="sub">Touch to Create — управление дисплеем</div>
+
+    <div class="label">Поворот экрана</div>
+    <div class="row">
+      <button class="rot" data-rot="0">0°</button>
+      <button class="rot" data-rot="90">90°</button>
+      <button class="rot" data-rot="180">180°</button>
+      <button class="rot" data-rot="270">270°</button>
+    </div>
+
+    <div id="status" class="status">Загрузка состояния…</div>
+
+    <div class="footer">
+      Дисплей опрашивает <code>/api/state</code> каждые 2 сек —<br>
+      изменение поворота применится через ≤2 сек после нажатия.
+    </div>
+  </div>
+
+<script>
+  const buttons = document.querySelectorAll('button.rot');
+  const status  = document.getElementById('status');
+  let currentRotation = null;
+
+  function setStatus(msg, kind) {
+    status.textContent = msg;
+    status.className = 'status' + (kind ? ' ' + kind : '');
+  }
+  function setActive(rot) {
+    currentRotation = rot;
+    buttons.forEach(b => {
+      b.classList.toggle('active', Number(b.dataset.rot) === rot);
+    });
+  }
+
+  async function loadState() {
+    try {
+      const r = await fetch('/api/state', { cache: 'no-store' });
+      const j = await r.json();
+      setActive(j.rotation);
+      if (j._kvError) {
+        setStatus('KV не настроен — изменения не сохранятся.\n' + j._kvError, 'err');
+      } else {
+        setStatus('Текущий поворот: ' + j.rotation + '°', 'ok');
+      }
+    } catch (err) {
+      setStatus('Ошибка загрузки: ' + err.message, 'err');
+    }
+  }
+
+  async function sendRotation(rot) {
+    setStatus('Отправка ' + rot + '° …', 'busy');
+    try {
+      const r = await fetch('/api/state', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rotation: rot }),
+      });
+      const j = await r.json();
+      if (!r.ok) {
+        setStatus('Ошибка: ' + (j.error || r.status), 'err');
+        return;
+      }
+      setActive(j.rotation);
+      setStatus('Установлено ' + j.rotation + '° — дисплей подхватит через ≤2 сек', 'ok');
+    } catch (err) {
+      setStatus('Ошибка сети: ' + err.message, 'err');
+    }
+  }
+
+  buttons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const rot = Number(btn.dataset.rot);
+      sendRotation(rot);
+    });
+  });
+
+  loadState();
+  // Re-poll every 5s so the panel reflects external changes too.
+  setInterval(loadState, 5000);
+</script>
+</body>
+</html>

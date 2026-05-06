@@ -1,0 +1,16 @@
+{
+  "name": "touch-to-create-v2",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "touch-to-create": "./server.js"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "redis": "^4.7.0"
+  }
+}
