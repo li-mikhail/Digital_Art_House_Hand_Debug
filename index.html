@@ -1044,28 +1044,30 @@
 
   .debug-toggle {
     position: fixed;
-    top: 18px;
-    right: 18px;
+    top: 12px;
+    right: 12px;
     z-index: 1000;
-    width: 54px;
-    height: 54px;
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
-    border: 1px solid rgba(255, 255, 255, 0.35);
-    background: rgba(12, 16, 24, 0.48);
-    color: rgba(255, 255, 255, 0.9);
-    font: 24px/1 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    border: 0;
+    background: transparent;
+    color: transparent;
+    font: 0/1 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
+    opacity: 0;
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 
   .debug-toggle:active {
-    transform: scale(0.96);
+    transform: none;
   }
 
   .debug-panel {
@@ -1326,7 +1328,7 @@
   </button>
 </div>
 
-<button class="debug-toggle" id="debugToggle" type="button" aria-label="Open debug settings">⚙</button>
+<button class="debug-toggle" id="debugToggle" type="button" aria-label="Open debug settings"></button>
 <div class="debug-panel" id="debugPanel" hidden>
   <div class="debug-title">
     <span>Debug Performance</span>
@@ -1460,26 +1462,28 @@
   const DESIGN_H = 1920;
   const frame = document.getElementById('frame');
   const DEBUG_PANEL_ENABLED = new URLSearchParams(location.search).get('debug') !== '0';
-  const DEBUG_STORAGE_KEY = 'touchToCreateDebugSettingsV1';
+  const DEBUG_SETTINGS_VERSION = 2;
+  const DEBUG_STORAGE_KEY = 'touchToCreateDebugSettingsV2';
+  const DEBUG_LEGACY_STORAGE_KEYS = ['touchToCreateDebugSettingsV1'];
   const DEBUG_DEFAULTS = {
     canvasQuality: 100,
-    plasmaFps: 30,
-    dischargeRate: 10,
-    boltSegments: 10,
-    maxRingFragments: 4,
-    mainGlowBlur: 12,
-    midGlowBlur: 3,
-    radialMainBlur: 10,
-    radialBranchBlur: 6,
-    sideBranchBlur: 6,
-    arcFragmentBlur: 6,
-    ringRunnerBlur: 6,
-    ringSpriteBlur: 11,
-    particleCount: 18,
-    particleFps: 24,
+    plasmaFps: 25,
+    dischargeRate: 20,
+    boltSegments: 0,
+    maxRingFragments: 0,
+    mainGlowBlur: 0,
+    midGlowBlur: 0,
+    radialMainBlur: 0,
+    radialBranchBlur: 0,
+    sideBranchBlur: 0,
+    arcFragmentBlur: 0,
+    ringRunnerBlur: 0,
+    ringSpriteBlur: 0,
+    particleCount: 0,
+    particleFps: 1,
     glowIntensity: 100,
-    shadowsEnabled: true,
-    skyFlashBlur: true,
+    shadowsEnabled: false,
+    skyFlashBlur: false,
   };
 
   function clampNumber(value, min, max) {
@@ -1490,9 +1494,15 @@
 
   function loadDebugSettings() {
     try {
+      DEBUG_LEGACY_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
       const raw = localStorage.getItem(DEBUG_STORAGE_KEY);
       if (!raw) return { ...DEBUG_DEFAULTS };
-      return { ...DEBUG_DEFAULTS, ...JSON.parse(raw) };
+      const parsed = JSON.parse(raw);
+      if (parsed.version !== DEBUG_SETTINGS_VERSION || !parsed.settings) {
+        localStorage.removeItem(DEBUG_STORAGE_KEY);
+        return { ...DEBUG_DEFAULTS };
+      }
+      return { ...DEBUG_DEFAULTS, ...parsed.settings };
     } catch {
       return { ...DEBUG_DEFAULTS };
     }
@@ -1529,7 +1539,10 @@
 
   function saveDebugSettings() {
     try {
-      localStorage.setItem(DEBUG_STORAGE_KEY, JSON.stringify(debugSettings));
+      localStorage.setItem(DEBUG_STORAGE_KEY, JSON.stringify({
+        version: DEBUG_SETTINGS_VERSION,
+        settings: debugSettings,
+      }));
     } catch {
       // Ignore private-mode quota errors; live settings still work.
     }
@@ -3199,6 +3212,7 @@
   // Segment count scales with bolt length so longer bolts get proportionally more
   // kinks (a stretched bolt doesn't degenerate into a near-straight line).
   const BOLT_BASE_PX_PER_SEG = 28;    // v6 perf: was 18px; fewer segments = fewer strokes
+  const BOLT_REFERENCE_SEGMENT_LEVEL = 10;
   const BOLT_MIN_SEGS = 6;
   const BOLT_MAX_SEGS = 42;
   let boltOffsets = null;        // cached perpendicular offsets per segment
@@ -3211,7 +3225,7 @@
     const len = Math.sqrt(dx * dx + dy * dy);
     const segmentLevel = clampNumber(debugSettings.boltSegments, 0, 20);
     if (segmentLevel <= 0) return 2;
-    const pxPerSegment = BOLT_BASE_PX_PER_SEG * (DEBUG_DEFAULTS.boltSegments / segmentLevel);
+    const pxPerSegment = BOLT_BASE_PX_PER_SEG * (BOLT_REFERENCE_SEGMENT_LEVEL / segmentLevel);
     return Math.max(BOLT_MIN_SEGS,
            Math.min(BOLT_MAX_SEGS, Math.round(len / pxPerSegment)));
   }
